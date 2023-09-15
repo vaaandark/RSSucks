@@ -10,7 +10,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "RSSucks",
         native_options,
-        Box::new(|cc| Box::new(rs_sxcks::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(rs_sxcks::RSSucks::new(cc))),
     )
 }
 
@@ -27,7 +27,7 @@ fn main() {
             .start(
                 "rs_sxcks_canvas", // hardcode it
                 web_options,
-                Box::new(|cc| Box::new(rs_sxcks::TemplateApp::new(cc))),
+                Box::new(|cc| Box::new(rs_sxcks::RSSucks::new(cc))),
             )
             .await
             .expect("failed to start eframe");
