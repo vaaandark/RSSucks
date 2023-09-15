@@ -1,3 +1,7 @@
+# RSSucks
+
+online demo: [click me](https://rss.carrot.cool/)
+
 # eframe template
 
 [![dependency status](https://deps.rs/repo/github/emilk/eframe_template/status.svg)](https://deps.rs/repo/github/emilk/eframe_template)
