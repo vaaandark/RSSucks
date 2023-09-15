@@ -26,6 +26,23 @@ impl RSSucks {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
+        let mut fonts = egui::FontDefinitions::default();
+        fonts.font_data.insert(
+            "NeoXiHei".to_owned(),
+            egui::FontData::from_static(include_bytes!("../assets/LXGWNeoXiHei.ttf")),
+        );
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .push("NeoXiHei".to_owned());
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .push("NeoXiHei".to_owned());
+        cc.egui_ctx.set_fonts(fonts);
+
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
@@ -101,6 +118,7 @@ impl eframe::App for RSSucks {
                 "https://github.com/emilk/eframe_template/blob/master/",
                 "Source code."
             ));
+            ui.label("我们能支持中文吗？");
             egui::warn_if_debug_build(ui);
         });
 
