@@ -1,23 +1,58 @@
+use derivative::Derivative;
+use std::{collections::BTreeSet, time};
+
+#[derive(Derivative, serde::Deserialize, serde::Serialize)]
+#[derivative(Eq, PartialEq, Ord, PartialOrd)]
+pub struct Category {
+    name: String,
+
+    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    feeds: BTreeSet<Feed>,
+}
+
+impl Category {}
+
+#[derive(Derivative, serde::Deserialize, serde::Serialize)]
+#[derivative(Eq, PartialEq, Ord, PartialOrd)]
+pub struct Feed {
+    name: String,
+    url: String,
+
+    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    articles: BTreeSet<Article>,
+}
+
+impl Feed {}
+
+#[derive(Derivative, serde::Deserialize, serde::Serialize)]
+#[derivative(Eq, PartialEq, Ord, PartialOrd)]
+pub struct Article {
+    update_time: time::SystemTime,
+    create_time: time::SystemTime,
+    title: String,
+    content: String,
+}
+
+impl Article {}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct RSSucks {
-    // Example stuff:
-    label: String,
-    list_unread_only: bool,
+    categories: BTreeSet<Category>,
 
     // this how you opt-out of serialization of a member
     #[serde(skip)]
-    value: f32,
+    list_unread_only: bool,
 }
 
 impl Default for RSSucks {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Hello World!".to_owned(),
             list_unread_only: false,
-            value: 2.7,
+
+            categories: BTreeSet::new(),
         }
     }
 }
@@ -64,12 +99,6 @@ impl eframe::App for RSSucks {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let Self {
-            label,
-            list_unread_only,
-            value,
-        } = self;
-
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
         // Tip: a good default choice is to just keep the `CentralPanel`.
