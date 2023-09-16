@@ -17,6 +17,8 @@ log = "0.4"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
+reqwest = "0.11.20"
+derivative = "2.2.0"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -28,7 +30,11 @@ wasm-bindgen-futures = "0.4"
 
 
 [profile.release]
-opt-level = 2 # fast and small wasm
+strip = true
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
