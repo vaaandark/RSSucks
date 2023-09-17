@@ -1,21 +1,29 @@
 use derivative::Derivative;
-use std::{collections::BTreeSet, time};
+use std::rc::{self, Rc};
+use std::{collections::BTreeMap, collections::BTreeSet, collections::HashMap, time};
 
 #[derive(Derivative, serde::Deserialize, serde::Serialize)]
-#[derivative(Eq, PartialEq, Ord, PartialOrd)]
-pub struct Category {
-    name: String,
-
-    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    feeds: BTreeSet<Feed>,
+pub enum DirectoryEntry {
+    Directory(Directory),
+    Feed(Feed),
 }
 
-impl Category {}
+#[derive(Derivative, serde::Deserialize, serde::Serialize)]
+#[derivative(Eq, PartialEq, Ord, PartialOrd, Default)]
+pub struct Directory {
+    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    entries: BTreeMap<String, DirectoryEntry>,
+
+    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    #[serde(skip)]
+    naming_text_buffer: String,
+}
+
+impl Directory {}
 
 #[derive(Derivative, serde::Deserialize, serde::Serialize)]
 #[derivative(Eq, PartialEq, Ord, PartialOrd)]
 pub struct Feed {
-    name: String,
     url: String,
 
     #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
@@ -39,11 +47,16 @@ impl Article {}
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct RSSucks {
-    categories: BTreeSet<Category>,
+    root_directory: Directory,
 
-    // this how you opt-out of serialization of a member
     #[serde(skip)]
     list_unread_only: bool,
+
+    // title => (state, ui)
+    #[serde(skip)]
+    windows: HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
+    #[serde(skip)]
+    window_editing_areas: HashMap<String, String>,
 }
 
 impl Default for RSSucks {
@@ -51,8 +64,10 @@ impl Default for RSSucks {
         Self {
             // Example stuff:
             list_unread_only: false,
+            root_directory: Directory::default(),
 
-            categories: BTreeSet::new(),
+            windows: HashMap::new(),
+            window_editing_areas: HashMap::new(),
         }
     }
 }
@@ -87,6 +102,36 @@ impl RSSucks {
         }
 
         Default::default()
+    }
+
+    fn recursively_render_directory(
+        windows: &mut HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
+        window_editing_areas: &mut HashMap<String, String>,
+        directory: &mut Directory,
+        ui: &mut egui::Ui,
+    ) {
+        for (name, entry) in &mut directory.entries {
+            match entry {
+                DirectoryEntry::Feed(_) => {
+                    ui.label(name);
+                }
+                DirectoryEntry::Directory(directory) => {
+                    ui.collapsing(name, |ui| {
+                        if ui.button("+ 新建目录").clicked() {
+                            let window_title = "新建目录";
+                            window_editing_areas.insert(window_title.to_owned(), String::new());
+                        }
+                        ui.separator();
+                        Self::recursively_render_directory(
+                            windows,
+                            window_editing_areas,
+                            directory,
+                            ui,
+                        );
+                    });
+                }
+            }
+        }
     }
 }
 
@@ -131,22 +176,14 @@ impl eframe::App for RSSucks {
             ui.separator();
 
             ui.label("订阅列表");
+            ui.separator();
 
-            let categories = vec![
-                "好看的",
-                "也不是不能看的",
-                "不好看的",
-                "难看的",
-                "浪费手机资源的",
-            ];
-
-            for category in categories {
-                ui.collapsing(category, |ui| {
-                    for i in 0..3 {
-                        ui.button(format!("{}-{}", category, i));
-                    }
-                });
-            }
+            Self::recursively_render_directory(
+                &mut self.windows,
+                &mut self.window_editing_areas,
+                &mut self.root_directory,
+                ui,
+            );
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -170,13 +207,13 @@ impl eframe::App for RSSucks {
             }
         });
 
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally choose either panels OR windows.");
-            });
+        self.windows.retain(|_, (state, _)| *state);
+        self.window_editing_areas
+            .retain(|id, _| self.windows.contains_key(id));
+        for (title, (state, closure)) in &mut self.windows {
+            egui::Window::new(title.as_str())
+                .open(state)
+                .show(ctx, closure);
         }
     }
 }
