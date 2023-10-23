@@ -1,6 +1,5 @@
 use derivative::Derivative;
-use std::rc::{self, Rc};
-use std::{collections::BTreeMap, collections::BTreeSet, collections::HashMap, time};
+use std::{collections::BTreeMap, collections::BTreeSet, time};
 
 #[derive(Derivative, serde::Deserialize, serde::Serialize)]
 pub enum DirectoryEntry {
@@ -13,10 +12,6 @@ pub enum DirectoryEntry {
 pub struct Directory {
     #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
     entries: BTreeMap<String, DirectoryEntry>,
-
-    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    #[serde(skip)]
-    naming_text_buffer: String,
 }
 
 impl Directory {}
@@ -44,32 +39,11 @@ pub struct Article {
 impl Article {}
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[serde(default)]
 pub struct RSSucks {
-    root_directory: Directory,
-
     #[serde(skip)]
     list_unread_only: bool,
-
-    // title => (state, ui)
-    #[serde(skip)]
-    windows: HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
-    #[serde(skip)]
-    window_editing_areas: HashMap<String, String>,
-}
-
-impl Default for RSSucks {
-    fn default() -> Self {
-        Self {
-            // Example stuff:
-            list_unread_only: false,
-            root_directory: Directory::default(),
-
-            windows: HashMap::new(),
-            window_editing_areas: HashMap::new(),
-        }
-    }
 }
 
 impl RSSucks {
@@ -102,36 +76,6 @@ impl RSSucks {
         }
 
         Default::default()
-    }
-
-    fn recursively_render_directory(
-        windows: &mut HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
-        window_editing_areas: &mut HashMap<String, String>,
-        directory: &mut Directory,
-        ui: &mut egui::Ui,
-    ) {
-        for (name, entry) in &mut directory.entries {
-            match entry {
-                DirectoryEntry::Feed(_) => {
-                    ui.label(name);
-                }
-                DirectoryEntry::Directory(directory) => {
-                    ui.collapsing(name, |ui| {
-                        if ui.button("+ 新建目录").clicked() {
-                            let window_title = "新建目录";
-                            window_editing_areas.insert(window_title.to_owned(), String::new());
-                        }
-                        ui.separator();
-                        Self::recursively_render_directory(
-                            windows,
-                            window_editing_areas,
-                            directory,
-                            ui,
-                        );
-                    });
-                }
-            }
-        }
     }
 }
 
@@ -169,21 +113,14 @@ impl eframe::App for RSSucks {
 
             ui.separator();
 
-            ui.button("今日订阅");
-            ui.button("等下再看");
-            ui.button("我的收藏");
+            let _ = ui.button("今日订阅");
+            let _ = ui.button("等下再看");
+            let _ = ui.button("我的收藏");
 
             ui.separator();
 
             ui.label("订阅列表");
             ui.separator();
-
-            Self::recursively_render_directory(
-                &mut self.windows,
-                &mut self.window_editing_areas,
-                &mut self.root_directory,
-                ui,
-            );
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -206,14 +143,5 @@ impl eframe::App for RSSucks {
                 ui.label("这下面可能还需要列一堆订阅的文章、题图和摘要出来。可能要写个新的控件，先摆了总之");
             }
         });
-
-        self.windows.retain(|_, (state, _)| *state);
-        self.window_editing_areas
-            .retain(|id, _| self.windows.contains_key(id));
-        for (title, (state, closure)) in &mut self.windows {
-            egui::Window::new(title.as_str())
-                .open(state)
-                .show(ctx, closure);
-        }
     }
 }
