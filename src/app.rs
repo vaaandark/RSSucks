@@ -1,6 +1,5 @@
 use derivative::Derivative;
-use std::rc::{self, Rc};
-use std::{collections::BTreeMap, collections::BTreeSet, collections::HashMap, time};
+use std::{collections::BTreeMap, collections::BTreeSet, time};
 
 #[derive(Derivative, serde::Deserialize, serde::Serialize)]
 pub enum DirectoryEntry {
@@ -13,10 +12,6 @@ pub enum DirectoryEntry {
 pub struct Directory {
     #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
     entries: BTreeMap<String, DirectoryEntry>,
-
-    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    #[serde(skip)]
-    naming_text_buffer: String,
 }
 
 impl Directory {}
@@ -44,32 +39,11 @@ pub struct Article {
 impl Article {}
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[serde(default)]
 pub struct RSSucks {
-    root_directory: Directory,
-
     #[serde(skip)]
     list_unread_only: bool,
-
-    // title => (state, ui)
-    #[serde(skip)]
-    windows: HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
-    #[serde(skip)]
-    window_editing_areas: HashMap<String, String>,
-}
-
-impl Default for RSSucks {
-    fn default() -> Self {
-        Self {
-            // Example stuff:
-            list_unread_only: false,
-            root_directory: Directory::default(),
-
-            windows: HashMap::new(),
-            window_editing_areas: HashMap::new(),
-        }
-    }
 }
 
 impl RSSucks {
@@ -103,36 +77,6 @@ impl RSSucks {
 
         Default::default()
     }
-
-    fn recursively_render_directory(
-        windows: &mut HashMap<String, (bool, Box<dyn Fn(&mut egui::Ui)>)>,
-        window_editing_areas: &mut HashMap<String, String>,
-        directory: &mut Directory,
-        ui: &mut egui::Ui,
-    ) {
-        for (name, entry) in &mut directory.entries {
-            match entry {
-                DirectoryEntry::Feed(_) => {
-                    ui.label(name);
-                }
-                DirectoryEntry::Directory(directory) => {
-                    ui.collapsing(name, |ui| {
-                        if ui.button("+ 新建目录").clicked() {
-                            let window_title = "新建目录";
-                            window_editing_areas.insert(window_title.to_owned(), String::new());
-                        }
-                        ui.separator();
-                        Self::recursively_render_directory(
-                            windows,
-                            window_editing_areas,
-                            directory,
-                            ui,
-                        );
-                    });
-                }
-            }
-        }
-    }
 }
 
 impl eframe::App for RSSucks {
@@ -143,25 +87,16 @@ impl eframe::App for RSSucks {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.draw_side_panel(ctx);
+        self.draw_top_panel(ctx, frame);
+        self.draw_central_panel(ctx);
+    }
+}
 
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-            });
-        });
-
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+impl RSSucks {
+    fn draw_side_panel(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("left_panel").show(ctx, |ui| {
             ui.heading("Rust Sucks");
             ui.label("用 Rust 写的 RSS 阅读器");
             ui.label("虽然还不能用但是给我个 Star 好不好就当投资了嘛");
@@ -169,23 +104,32 @@ impl eframe::App for RSSucks {
 
             ui.separator();
 
-            ui.button("今日订阅");
-            ui.button("等下再看");
-            ui.button("我的收藏");
+            let _ = ui.button("今日订阅");
+            let _ = ui.button("等下再看");
+            let _ = ui.button("我的收藏");
 
             ui.separator();
 
             ui.label("订阅列表");
             ui.separator();
-
-            Self::recursively_render_directory(
-                &mut self.windows,
-                &mut self.window_editing_areas,
-                &mut self.root_directory,
-                ui,
-            );
         });
+    }
 
+    fn draw_top_panel(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            // The top panel is often a good place for a menu bar:
+            egui::menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("Quit").clicked() {
+                        frame.close();
+                    }
+                });
+            });
+        });
+    }
+
+    fn draw_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("订阅分类或者订阅本身的标题");
             ui.label("一些关于订阅或者分类的介绍 blablablabla");
@@ -206,14 +150,5 @@ impl eframe::App for RSSucks {
                 ui.label("这下面可能还需要列一堆订阅的文章、题图和摘要出来。可能要写个新的控件，先摆了总之");
             }
         });
-
-        self.windows.retain(|_, (state, _)| *state);
-        self.window_editing_areas
-            .retain(|id, _| self.windows.contains_key(id));
-        for (title, (state, closure)) in &mut self.windows {
-            egui::Window::new(title.as_str())
-                .open(state)
-                .show(ctx, closure);
-        }
     }
 }

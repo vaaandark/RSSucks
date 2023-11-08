@@ -1,10 +1,7 @@
 use anyhow::Result;
 use ego_tree::iter::Edge;
-use egui::{Label, Separator};
-use scraper::{Html, Selector};
-use std::cmp::Ordering;
-use std::io::BufReader;
-use std::{fs::File, io::Read};
+use egui::Separator;
+use scraper::Html;
 
 // let mut feeds: Vec<feed_rs::model::Feed> = Vec::new();
 
@@ -123,26 +120,4 @@ pub fn render_article_html_to_component(html: &str, ui: &mut egui::Ui) -> Result
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-#[test]
-fn t() {
-    let file = File::open("/home/weiyi/projects/RSSucks/src/example.html").unwrap();
-    let mut reader = BufReader::new(file);
-    let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).unwrap();
-    let document = String::from_utf8(buffer).unwrap();
-    let fragment = Html::parse_fragment(&document);
-    let edges: Vec<_> = fragment.root_element().traverse().collect();
-    for edge in edges {
-        match edge {
-            Edge::Open(node) => {
-                println!("Open: {:?}", node.value());
-            }
-            Edge::Close(node) => {
-                println!("Close: {:?}", node.value());
-            }
-        }
-    }
 }

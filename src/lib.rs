@@ -2,3 +2,4 @@
 
 mod app;
 pub use app::RSSucks;
+pub mod renderer;
