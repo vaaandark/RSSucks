@@ -1,5 +1,6 @@
 use anyhow::{Context, Ok, Result};
 use opml::OPML;
+use reqwest::Url;
 
 #[derive(Debug)]
 #[allow(unused)]
@@ -18,7 +19,7 @@ struct Head {
 #[allow(unused)]
 struct Entry {
     pub text: String,
-    pub url: String,
+    pub url: Option<Url>,
 }
 
 #[derive(Debug)]
@@ -43,43 +44,40 @@ struct Body {
 
 impl Opml {
     #[allow(unused)]
-    fn flat_nested_folder(folder: &mut Folder, outline: &opml::Outline) {
-        for o in &outline.outlines {
-            Self::flat_nested_folder(folder, o);
-        }
+    fn flatten_nested_folder(outline: &opml::Outline) -> Vec<Entry> {
         if let Some(url) = outline.xml_url.as_ref() {
-            folder.entries.push(Entry {
+            vec![Entry {
                 text: outline.text.to_owned(),
-                url: url.to_owned(),
-            });
+                url: Url::parse(url).ok(),
+            }]
+        } else {
+            outline
+                .outlines
+                .iter()
+                .flat_map(Self::flatten_nested_folder)
+                .collect::<Vec<Entry>>()
         }
     }
 
     #[allow(unused)]
     fn from_str(xml: &str) -> Result<Self> {
         let document = OPML::from_str(xml).with_context(|| "Failed to parse OPML file.")?;
-        let mut head = None;
-        if let Some(doc_head) = document.head {
-            head = Some(Head {
-                title: doc_head.title,
-            })
-        }
+        let mut head = document.head.map(|h| Head { title: h.title });
         let mut outlines = vec![];
         for outline in document.body.outlines {
             // is an entry?
-            if let Some(url) = outline.xml_url {
+            if let Some(url) = outline.xml_url.as_ref() {
                 let entry = Entry {
                     text: outline.text,
-                    url,
+                    url: Url::parse(url).ok(),
                 };
                 outlines.push(OutLine::Entry(entry));
             } else {
                 // a folder?
-                let mut folder = Folder {
+                let folder = Folder {
                     text: outline.text.to_owned(),
-                    entries: vec![],
+                    entries: Self::flatten_nested_folder(&outline),
                 };
-                Self::flat_nested_folder(&mut folder, &outline);
                 outlines.push(OutLine::Folder(folder));
             }
         }
