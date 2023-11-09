@@ -46,6 +46,65 @@ struct Body {
     pub outlines: Vec<OutLine>,
 }
 
+impl From<&Entry> for opml::Outline {
+    fn from(value: &Entry) -> Self {
+        opml::Outline {
+            text: value.text.to_owned(),
+            title: value.title.as_ref().map(|t| t.to_owned()),
+            xml_url: value.xml_url.as_ref().map(|u| u.as_str().to_owned()),
+            html_url: value.html_url.as_ref().map(|u| u.as_str().to_owned()),
+            r#type: Some("rss".to_owned()),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&Folder> for opml::Outline {
+    fn from(value: &Folder) -> Self {
+        let sub_outlines = value
+            .entries
+            .iter()
+            .map(opml::Outline::from)
+            .collect::<Vec<_>>();
+        opml::Outline {
+            text: value.text.to_owned(),
+            title: value.title.as_ref().map(|t| t.to_owned()),
+            outlines: sub_outlines,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&OutLine> for opml::Outline {
+    fn from(value: &OutLine) -> Self {
+        match value {
+            OutLine::Entry(e) => opml::Outline::from(e),
+            OutLine::Folder(f) => opml::Outline::from(f),
+        }
+    }
+}
+
+impl From<&Body> for opml::Body {
+    fn from(value: &Body) -> Self {
+        opml::Body {
+            outlines: value
+                .outlines
+                .iter()
+                .map(opml::Outline::from)
+                .collect::<Vec<_>>(),
+        }
+    }
+}
+
+impl From<&Head> for opml::Head {
+    fn from(value: &Head) -> Self {
+        opml::Head {
+            title: value.title.to_owned(),
+            ..Default::default()
+        }
+    }
+}
+
 impl Opml {
     #[allow(unused)]
     fn flatten_nested_folder(outline: &opml::Outline) -> Vec<Entry> {
@@ -100,49 +159,10 @@ impl Opml {
     }
 
     #[allow(unused)]
-    fn to_string(&self) -> Result<String> {
+    fn dump(&self) -> Result<String> {
         let version = self.version.to_owned();
-        let head = self.head.as_ref().map(|h| opml::Head {
-            title: h.title.to_owned(),
-            ..Default::default()
-        });
-        let body = opml::Body {
-            outlines: self
-                .body
-                .outlines
-                .iter()
-                .map(|outline| match outline {
-                    OutLine::Folder(f) => {
-                        let sub_outlines = f
-                            .entries
-                            .iter()
-                            .map(|e| opml::Outline {
-                                text: e.text.to_owned(),
-                                title: e.title.as_ref().map(|t| t.to_owned()),
-                                xml_url: e.xml_url.as_ref().map(|u| u.as_str().to_owned()),
-                                html_url: e.html_url.as_ref().map(|u| u.as_str().to_owned()),
-                                r#type: Some("rss".to_owned()),
-                                ..Default::default()
-                            })
-                            .collect::<Vec<_>>();
-                        opml::Outline {
-                            text: f.text.to_owned(),
-                            title: f.title.as_ref().map(|t| t.to_owned()),
-                            outlines: sub_outlines,
-                            ..Default::default()
-                        }
-                    }
-                    OutLine::Entry(e) => opml::Outline {
-                        text: e.text.to_owned(),
-                        title: e.title.as_ref().map(|t| t.to_owned()),
-                        xml_url: e.xml_url.as_ref().map(|u| u.as_str().to_owned()),
-                        html_url: e.html_url.as_ref().map(|u| u.as_str().to_owned()),
-                        r#type: Some("rss".to_owned()),
-                        ..Default::default()
-                    },
-                })
-                .collect::<Vec<_>>(),
-        };
+        let head = self.head.as_ref().map(opml::Head::from);
+        let body = opml::Body::from(&self.body);
         OPML {
             version,
             head,
@@ -175,6 +195,6 @@ mod test {
     fn dump_opml() {
         let xml = read_to_string("./OPMLs/example1.opml").unwrap();
         let opml = Opml::from_str(&xml).unwrap();
-        assert_eq!(xml, opml.to_string().unwrap());
+        assert_eq!(xml, opml.dump().unwrap());
     }
 }
