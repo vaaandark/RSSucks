@@ -1,18 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<opml version="1.0">
-    <head>
-        <title>Feed Subscriptions</title>
-    </head>
-    <body>
-        <outline title="Software" text="Software">
-            <outline text="小众软件" title="小众软件" type="rss"
-                xmlUrl="https://feeds.appinn.com/appinns/" htmlUrl="https://www.appinn.com" />
-            <outline title="Software" text="">
-                <outline text="异次元软件世界" title="异次元软件世界" type="rss"
-                    xmlUrl="https://feed.iplaysoft.com/" htmlUrl="https://www.iplaysoft.com" />
-            </outline>
-        </outline>
-        <outline text="少数派" title="少数派" type="rss"
-            xmlUrl="https://sspai.com/feed" htmlUrl="https://sspai.com" />
-    </body>
-</opml>
+<opml version="2.0"><head><title>Feed Subscriptions</title></head><body><outline text="Software" title="Software"><outline text="小众软件" type="rss" xmlUrl="https://feeds.appinn.com/appinns/" htmlUrl="https://www.appinn.com/" title="小众软件"/><outline text="异次元软件世界" type="rss" xmlUrl="https://feed.iplaysoft.com/" htmlUrl="https://www.iplaysoft.com/" title="异次元软件世界"/></outline><outline text="少数派" type="rss" xmlUrl="https://sspai.com/feed" htmlUrl="https://sspai.com/" title="少数派"/></body></opml>
