@@ -50,7 +50,7 @@ pub struct ArticleComponent<'a> {
     content: &'a str,
 }
 
-fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> Result<egui::RichText> {
+fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> egui::RichText {
     let richtext =
         dom_stack.iter().fold(
             egui::RichText::new(text),
@@ -67,7 +67,7 @@ fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> Result<egui:
                 _ => richtext,
             },
         );
-    Ok(richtext)
+    richtext
 }
 
 impl<'a> ArticleComponent<'_> {
@@ -106,7 +106,7 @@ impl<'a> ArticleComponent<'_> {
                         if text.is_empty() {
                             continue;
                         }
-                        let richtext = richtext_generator(&text, &dom_stack)?;
+                        let richtext = richtext_generator(&text, &dom_stack);
                         let hyperlink_destination = dom_stack.iter().fold(None, |dest, element| {
                             if let &ElementType::A { destination } = element {
                                 destination
