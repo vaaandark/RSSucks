@@ -196,15 +196,13 @@ impl Opml {
     #[allow(unused)]
     fn try_from_str(xml: &str) -> Result<Self> {
         Ok(Opml::from(
-            &OPML::from_str(xml).with_context(|| "Failed to parse OPML file.")?,
+            &OPML::from_str(xml).context("Failed to parse OPML file.")?,
         ))
     }
 
     #[allow(unused)]
     fn try_dump(&self) -> Result<String> {
-        OPML::from(self)
-            .to_string()
-            .with_context(|| "Failed to dump OPML.")
+        OPML::from(self).to_string().context("Failed to dump OPML.")
     }
 }
 
