@@ -1,7 +1,10 @@
+//! Wrapper for external crate [`opml`].
 use anyhow::{Context, Ok, Result};
 use opml::OPML;
 use reqwest::Url;
 
+/// Main data structure for OPML,
+/// which can be converted from [`opml::OPML`].
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Opml {
@@ -10,12 +13,14 @@ pub struct Opml {
     pub body: Body,
 }
 
+/// OPML head, which can be converted from [`opml::Head`].
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Head {
     pub title: Option<String>,
 }
 
+/// Feed entry, which can be converted from [`opml::Outline`].
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Entry {
@@ -25,6 +30,8 @@ pub struct Entry {
     pub html_url: Option<Url>,
 }
 
+/// A folder for containing a series of subscriptions on similar topics,
+/// which can be converted from [`opml::Outline`]
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Folder {
@@ -33,17 +40,20 @@ pub struct Folder {
     pub entries: Vec<Entry>,
 }
 
+/// OPML outline, which can be converted from [`opml::Outline`],
+/// and can be a folder or an entry.
 #[derive(Debug)]
 #[allow(unused)]
-pub enum OutLine {
+pub enum Outline {
     Folder(Folder),
     Entry(Entry),
 }
 
+/// OPML body, which can be converted from [`opml::Body`].
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Body {
-    pub outlines: Vec<OutLine>,
+    pub outlines: Vec<Outline>,
 }
 
 impl From<&Entry> for opml::Outline {
@@ -75,11 +85,11 @@ impl From<&Folder> for opml::Outline {
     }
 }
 
-impl From<&OutLine> for opml::Outline {
-    fn from(value: &OutLine) -> Self {
+impl From<&Outline> for opml::Outline {
+    fn from(value: &Outline) -> Self {
         match value {
-            OutLine::Entry(e) => opml::Outline::from(e),
-            OutLine::Folder(f) => opml::Outline::from(f),
+            Outline::Entry(e) => opml::Outline::from(e),
+            Outline::Folder(f) => opml::Outline::from(f),
         }
     }
 }
@@ -129,18 +139,18 @@ impl From<&opml::Outline> for Folder {
 impl From<&opml::Body> for Body {
     fn from(value: &opml::Body) -> Self {
         Body {
-            outlines: value.outlines.iter().map(OutLine::from).collect::<Vec<_>>(),
+            outlines: value.outlines.iter().map(Outline::from).collect::<Vec<_>>(),
         }
     }
 }
 
-impl From<&opml::Outline> for OutLine {
+impl From<&opml::Outline> for Outline {
     fn from(value: &opml::Outline) -> Self {
         // Is an entry or a folder?
         if value.xml_url.is_some() {
-            OutLine::Entry(Entry::from(value))
+            Outline::Entry(Entry::from(value))
         } else {
-            OutLine::Folder(Folder::from(value))
+            Outline::Folder(Folder::from(value))
         }
     }
 }
@@ -193,6 +203,7 @@ impl Opml {
         }
     }
 
+    /// Attempts to parse a OPML XML file.
     #[allow(unused)]
     pub fn try_from_str(xml: &str) -> Result<Self> {
         Ok(Opml::from(
@@ -200,6 +211,7 @@ impl Opml {
         ))
     }
 
+    /// Attempts to dump to a OPML XML file.
     #[allow(unused)]
     pub fn try_dump(&self) -> Result<String> {
         OPML::from(self).to_string().context("Failed to dump OPML.")

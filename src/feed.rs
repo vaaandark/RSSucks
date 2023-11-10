@@ -1,3 +1,4 @@
+//! Data structures and operating interfaces for Rss feeds.
 use crate::opml;
 use anyhow::{Context, Error, Ok, Result};
 use reqwest::Url;
@@ -7,8 +8,9 @@ use std::ops::Deref;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use uuid::Uuid;
 
+/// Universally Unique Identifier for [`Entry`].
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-struct EntryUuid(Uuid);
+pub struct EntryUuid(Uuid);
 
 impl Deref for EntryUuid {
     type Target = Uuid;
@@ -23,8 +25,9 @@ impl From<Uuid> for EntryUuid {
     }
 }
 
+/// Universally Unique Identifier for [`Folder`].
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-struct FolderUuid(Uuid);
+pub struct FolderUuid(Uuid);
 
 impl Deref for FolderUuid {
     type Target = Uuid;
@@ -39,6 +42,8 @@ impl From<Uuid> for FolderUuid {
     }
 }
 
+/// OPML head information,
+/// which can be converted from [`opml::Head`].
 #[derive(Debug)]
 pub struct Head {
     pub title: Option<String>,
@@ -50,20 +55,30 @@ impl From<opml::Head> for Head {
     }
 }
 
+/// Feed entry, the basic unit for getting subsciptions from feed,
+/// which can be converted from [`opml::Entry`] (see [`Entry::try_from`]).
 #[allow(unused)]
 #[derive(Debug)]
-struct Entry {
+pub struct Entry {
+    /// The title of the feed.
     pub text: String,
+    /// Also the title.
     pub title: Option<String>,
+    /// URL of the RSS feed.
     pub xml_url: Url,
+    /// Homepage URL of the feed.
     pub html_url: Option<Url>,
+    /// The UUID of the folder to which this entry belongs.
+    /// > Note that if it's `None`, it belongs to no folder and is called **orphan** entry.
     pub belong_to: Option<FolderUuid>,
-    uuid: EntryUuid,
+    /// UUID of this feed.
+    pub uuid: EntryUuid,
 }
 
 impl Entry {
+    /// Creates an `Entry` for a feed.
     #[allow(unused)]
-    fn new(text: String, xml_url: Url) -> Self {
+    pub fn new(text: String, xml_url: Url) -> Self {
         Entry {
             title: Some(text.to_owned()),
             text,
@@ -74,8 +89,9 @@ impl Entry {
         }
     }
 
+    /// Creates an `Entry` with homepage URL of the feed.
     #[allow(unused)]
-    fn new_with_html_url(text: String, xml_url: Url, html_url: Url) -> Self {
+    pub fn new_with_html_url(text: String, xml_url: Url, html_url: Url) -> Self {
         Entry {
             title: Some(text.to_owned()),
             text,
@@ -86,7 +102,8 @@ impl Entry {
         }
     }
 
-    fn set_belonging(&mut self, belong_to: &FolderUuid) {
+    /// Set entry belongs to a folder.
+    pub fn set_belonging(&mut self, belong_to: &FolderUuid) {
         self.belong_to = Some(*belong_to);
     }
 }
@@ -107,13 +124,19 @@ impl TryFrom<opml::Entry> for Entry {
     }
 }
 
+/// A folder for containing a series of subscriptions on similar topics,
+/// which can **not** be converted from [`opml::Folder`] directly.
 #[allow(unused)]
 #[derive(Debug)]
-struct Folder {
-    text: String,
-    title: Option<String>,
-    entries: HashSet<EntryUuid>,
-    uuid: FolderUuid,
+pub struct Folder {
+    /// The title of the feed.
+    pub text: String,
+    /// Also the title, can be `None`.
+    pub title: Option<String>,
+    /// The IDs of entries which belong to this folder.
+    pub entries: HashSet<EntryUuid>,
+    /// UUID of this feed folder.
+    pub uuid: FolderUuid,
 }
 
 impl TryFrom<opml::Opml> for Feed {
@@ -127,12 +150,12 @@ impl TryFrom<opml::Opml> for Feed {
         let mut folders_map = HashMap::new();
         for outline in value.body.outlines {
             match outline {
-                opml::OutLine::Entry(e) => {
+                opml::Outline::Entry(e) => {
                     let entry = Rc::new(Entry::try_from(e)?);
                     entries_map.insert(entry.uuid, entry.clone());
                     orphans.insert(entry.uuid);
                 }
-                opml::OutLine::Folder(f) => {
+                opml::Outline::Folder(f) => {
                     let uuid = Uuid::new_v4().into();
                     let mut entries = HashSet::new();
                     for e in f.entries {
@@ -166,33 +189,45 @@ impl TryFrom<opml::Opml> for Feed {
     }
 }
 
+/// Main data structure for RSS feeds,
+/// which contains orphan entries directly and folders with entries inside.
+/// Feed can be converted from [`opml::Opml`].
 #[allow(unused)]
 #[derive(Debug)]
-struct Feed {
-    version: String,
-    head: Option<Head>,
-    folders: HashSet<FolderUuid>,
-    orphans: HashSet<EntryUuid>,
-    entries_map: HashMap<EntryUuid, Rc<Entry>>,
-    folders_map: HashMap<FolderUuid, Rc<RefCell<Folder>>>,
+pub struct Feed {
+    /// OPML version.
+    pub version: String,
+    /// OPML head.
+    pub head: Option<Head>,
+    /// IDs of feed folders.
+    pub folders: HashSet<FolderUuid>,
+    /// IDs of orphan feed entries which don't belong to any folders.
+    pub orphans: HashSet<EntryUuid>,
+    /// Map for all entries.
+    pub entries_map: HashMap<EntryUuid, Rc<Entry>>,
+    /// Map for all folders.
+    pub folders_map: HashMap<FolderUuid, Rc<RefCell<Folder>>>,
 }
 
 impl Feed {
+    /// Returns all folders.
     #[allow(unused)]
-    fn get_all_folders(&self) -> Vec<Rc<RefCell<Folder>>> {
+    pub fn get_all_folders(&self) -> Vec<Rc<RefCell<Folder>>> {
         self.folders_map.values().map(Rc::clone).collect()
     }
 
+    /// Returns the IDs of all folders.
     #[allow(unused)]
-    fn get_all_folder_ids(&self) -> Vec<FolderUuid> {
+    pub fn get_all_folder_ids(&self) -> Vec<FolderUuid> {
         self.folders_map
             .keys()
             .map(FolderUuid::clone)
             .collect::<Vec<_>>()
     }
 
+    /// Attempts to return the IDs of all entries in a folder by giving folder ID.
     #[allow(unused)]
-    fn try_get_entry_ids_by_folder_id(&self, folder_id: &FolderUuid) -> Result<Vec<EntryUuid>> {
+    pub fn try_get_entry_ids_by_folder_id(&self, folder_id: &FolderUuid) -> Result<Vec<EntryUuid>> {
         let folder = self.try_get_folder_by_id(folder_id)?;
         let entries = folder
             .try_borrow_mut()
@@ -204,30 +239,35 @@ impl Feed {
         Ok(entries)
     }
 
+    /// Returns all entries.
     #[allow(unused)]
-    fn get_all_entries(&self) -> Vec<Rc<Entry>> {
+    pub fn get_all_entries(&self) -> Vec<Rc<Entry>> {
         self.entries_map.values().map(Rc::clone).collect()
     }
 
+    /// Returns the title and the feed url of all entries.
     #[allow(unused)]
-    fn get_all_entry_basic_infos(&self) -> Vec<(String, Url)> {
+    pub fn get_all_entry_basic_infos(&self) -> Vec<(String, Url)> {
         self.entries_map
             .values()
             .map(|e| (e.text.to_owned(), e.xml_url.to_owned()))
             .collect()
     }
 
+    /// Returns the IDs of all entries.
     #[allow(unused)]
-    fn get_all_entry_ids(&self) -> Vec<EntryUuid> {
+    pub fn get_all_entry_ids(&self) -> Vec<EntryUuid> {
         self.entries_map.keys().map(EntryUuid::clone).collect()
     }
 
+    /// Returns the IDs of all orphan entries.
     #[allow(unused)]
-    fn get_all_orphan_entry_ids(&self) -> Vec<EntryUuid> {
+    pub fn get_all_orphan_entry_ids(&self) -> Vec<EntryUuid> {
         self.orphans.iter().map(EntryUuid::clone).collect()
     }
 
-    fn try_get_folder_by_id(&self, id: &FolderUuid) -> Result<Rc<RefCell<Folder>>> {
+    /// Attempts to return an folder by giving its ID.
+    pub fn try_get_folder_by_id(&self, id: &FolderUuid) -> Result<Rc<RefCell<Folder>>> {
         let folder = self
             .folders_map
             .get(id)
@@ -235,8 +275,9 @@ impl Feed {
         Ok(folder.clone())
     }
 
+    /// Attempts to return an entry by giving its ID.
     #[allow(unused)]
-    fn try_get_entry_by_id(&self, id: &EntryUuid) -> Result<Rc<Entry>> {
+    pub fn try_get_entry_by_id(&self, id: &EntryUuid) -> Result<Rc<Entry>> {
         let entry = self
             .entries_map
             .get(id)
@@ -244,8 +285,9 @@ impl Feed {
         Ok(entry.clone())
     }
 
+    /// Attempts to remove an entry by giving its ID.
     #[allow(unused)]
-    fn try_remove_entry_by_id(&mut self, id: &EntryUuid) -> Result<()> {
+    pub fn try_remove_entry_by_id(&mut self, id: &EntryUuid) -> Result<()> {
         let entry = self.try_get_entry_by_id(id)?;
         // Belong to a folder?
         if let Some(belong_to) = &entry.belong_to {
@@ -267,9 +309,11 @@ impl Feed {
         Ok(())
     }
 
+    /// Attempts to remove a folder by giving its ID.
     #[allow(unused)]
-    fn try_remove_folder_by_id(&mut self, id: &FolderUuid) -> Result<()> {
+    pub fn try_remove_folder_by_id(&mut self, id: &FolderUuid) -> Result<()> {
         let folder = self.try_get_folder_by_id(id)?;
+        // Remove all the entries of the folder from the general map of entries.
         folder
             .try_borrow_mut()
             .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **id))?
@@ -283,16 +327,18 @@ impl Feed {
         Ok(())
     }
 
+    /// Addes an orphan entry which doesn't belong to any folder.
     #[allow(unused)]
-    fn add_orphan_entry(&mut self, entry: Entry) -> EntryUuid {
+    pub fn add_orphan_entry(&mut self, entry: Entry) -> EntryUuid {
         let entry = Rc::new(entry);
         self.entries_map.insert(entry.uuid, entry.clone());
         self.orphans.insert(entry.uuid);
         entry.uuid
     }
 
+    /// Attempts to add an entry belonging to a folder by giving folder ID.
     #[allow(unused)]
-    fn try_add_entry_to_folder(
+    pub fn try_add_entry_to_folder(
         &mut self,
         entry: Entry,
         to_folder_uuid: &FolderUuid,
@@ -307,8 +353,11 @@ impl Feed {
         Ok(entry.uuid)
     }
 
+    /// Attempts to move an entry to another folder or make an entry orphan.
+    /// > Note that when `to_folder_id` is `None`, it will attempt to make the
+    /// entry belong to **no** folder.
     #[allow(unused)]
-    fn try_move_entry_to_folder(
+    pub fn try_move_entry_to_folder(
         &mut self,
         entry_id: &EntryUuid,
         to_folder_id: Option<&FolderUuid>,
@@ -347,8 +396,9 @@ impl Feed {
         Ok(())
     }
 
+    /// Returns the IDs of all entries with matching name.
     #[allow(unused)]
-    fn get_entry_ids_by_name(&self, name: &str) -> Vec<EntryUuid> {
+    pub fn get_entry_ids_by_name(&self, name: &str) -> Vec<EntryUuid> {
         let mut res = vec![];
         for (id, entry) in &self.entries_map {
             if entry.text.contains(name) {
@@ -358,8 +408,9 @@ impl Feed {
         res
     }
 
+    /// Returns the IDs of all folders with matching name.
     #[allow(unused)]
-    fn get_folder_ids_by_name(&self, name: &str) -> Vec<FolderUuid> {
+    pub fn get_folder_ids_by_name(&self, name: &str) -> Vec<FolderUuid> {
         let mut res = vec![];
         for (id, folder) in &self.folders_map {
             if folder.borrow().text.contains(name) {
