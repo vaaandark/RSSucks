@@ -24,6 +24,8 @@ scraper = "0.18.1"
 ego-tree = "0.6.2"
 egui_extras = { version = "0.23.0", features = ["all_loaders"] }
 image = { version = "0.24.7", features = ["jpeg", "png", "bmp", "gif", "webp"] }
+opml = "1.1.5"
+
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.10"
