@@ -19,6 +19,8 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 reqwest = "0.11.22"
 derivative = "2.2.0"
+opml = "1.1.5"
+anyhow = "1.0.75"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
