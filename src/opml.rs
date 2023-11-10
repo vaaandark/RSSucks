@@ -4,7 +4,7 @@ use reqwest::Url;
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Opml {
+pub struct Opml {
     pub version: String,
     pub head: Option<Head>,
     pub body: Body,
@@ -12,13 +12,13 @@ struct Opml {
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Head {
+pub struct Head {
     pub title: Option<String>,
 }
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Entry {
+pub struct Entry {
     pub text: String,
     pub title: Option<String>,
     pub xml_url: Option<Url>,
@@ -27,7 +27,7 @@ struct Entry {
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Folder {
+pub struct Folder {
     pub text: String,
     pub title: Option<String>,
     pub entries: Vec<Entry>,
@@ -35,14 +35,14 @@ struct Folder {
 
 #[derive(Debug)]
 #[allow(unused)]
-enum OutLine {
+pub enum OutLine {
     Folder(Folder),
     Entry(Entry),
 }
 
 #[derive(Debug)]
 #[allow(unused)]
-struct Body {
+pub struct Body {
     pub outlines: Vec<OutLine>,
 }
 
@@ -194,14 +194,14 @@ impl Opml {
     }
 
     #[allow(unused)]
-    fn try_from_str(xml: &str) -> Result<Self> {
+    pub fn try_from_str(xml: &str) -> Result<Self> {
         Ok(Opml::from(
             &OPML::from_str(xml).context("Failed to parse OPML file.")?,
         ))
     }
 
     #[allow(unused)]
-    fn try_dump(&self) -> Result<String> {
+    pub fn try_dump(&self) -> Result<String> {
         OPML::from(self).to_string().context("Failed to dump OPML.")
     }
 }
