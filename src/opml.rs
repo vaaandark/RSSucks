@@ -105,16 +105,85 @@ impl From<&Head> for opml::Head {
     }
 }
 
+impl From<&opml::Outline> for Entry {
+    fn from(value: &opml::Outline) -> Self {
+        Entry {
+            text: value.text.to_owned(),
+            title: value.title.as_ref().map(|t| t.to_owned()),
+            xml_url: value.xml_url.as_ref().and_then(|u| Url::parse(u).ok()),
+            html_url: value.html_url.as_ref().and_then(|u| Url::parse(u).ok()),
+        }
+    }
+}
+
+impl From<&opml::Outline> for Folder {
+    fn from(value: &opml::Outline) -> Self {
+        Folder {
+            text: value.text.to_owned(),
+            title: value.title.as_ref().map(|t| t.to_owned()),
+            entries: Opml::flatten_nested_folder(value),
+        }
+    }
+}
+
+impl From<&opml::Body> for Body {
+    fn from(value: &opml::Body) -> Self {
+        Body {
+            outlines: value.outlines.iter().map(OutLine::from).collect::<Vec<_>>(),
+        }
+    }
+}
+
+impl From<&opml::Outline> for OutLine {
+    fn from(value: &opml::Outline) -> Self {
+        // Is an entry or a folder?
+        if value.xml_url.is_some() {
+            OutLine::Entry(Entry::from(value))
+        } else {
+            OutLine::Folder(Folder::from(value))
+        }
+    }
+}
+
+impl From<&opml::Head> for Head {
+    fn from(value: &opml::Head) -> Self {
+        Head {
+            title: value.title.to_owned(),
+        }
+    }
+}
+
+impl From<&OPML> for Opml {
+    fn from(value: &OPML) -> Self {
+        let version = value.version.to_owned();
+        let head = value.head.as_ref().map(Head::from);
+        let body = Body::from(&value.body);
+        Opml {
+            version,
+            head,
+            body,
+        }
+    }
+}
+
+impl From<&Opml> for OPML {
+    fn from(value: &Opml) -> Self {
+        let version = value.version.to_owned();
+        let head = value.head.as_ref().map(opml::Head::from);
+        let body = opml::Body::from(&value.body);
+        OPML {
+            version,
+            head,
+            body,
+        }
+    }
+}
+
 impl Opml {
     #[allow(unused)]
     fn flatten_nested_folder(outline: &opml::Outline) -> Vec<Entry> {
-        if let Some(url) = outline.xml_url.as_ref() {
-            vec![Entry {
-                text: outline.text.to_owned(),
-                title: outline.title.as_ref().map(|t| t.to_owned()),
-                xml_url: Url::parse(url).ok(),
-                html_url: outline.html_url.as_ref().and_then(|u| Url::parse(u).ok()),
-            }]
+        if outline.xml_url.is_some() {
+            vec![Entry::from(outline)]
         } else {
             outline
                 .outlines
@@ -125,51 +194,17 @@ impl Opml {
     }
 
     #[allow(unused)]
-    fn from_str(xml: &str) -> Result<Self> {
-        let document = OPML::from_str(xml).with_context(|| "Failed to parse OPML file.")?;
-        let version = document.version;
-        let mut head = document.head.map(|h| Head { title: h.title });
-        let mut outlines = vec![];
-        for outline in document.body.outlines {
-            // is an entry?
-            if let Some(url) = outline.xml_url.as_ref() {
-                let entry = Entry {
-                    text: outline.text,
-                    title: outline.title.as_ref().map(|t| t.to_owned()),
-                    xml_url: Url::parse(url).ok(),
-                    html_url: outline.html_url.as_ref().and_then(|u| Url::parse(u).ok()),
-                };
-                outlines.push(OutLine::Entry(entry));
-            } else {
-                // a folder?
-                let folder = Folder {
-                    text: outline.text.to_owned(),
-                    title: outline.title.as_ref().map(|t| t.to_owned()),
-                    entries: Self::flatten_nested_folder(&outline),
-                };
-                outlines.push(OutLine::Folder(folder));
-            }
-        }
-        let body = Body { outlines };
-        Ok(Opml {
-            version,
-            head,
-            body,
-        })
+    fn try_from_str(xml: &str) -> Result<Self> {
+        Ok(Opml::from(
+            &OPML::from_str(xml).with_context(|| "Failed to parse OPML file.")?,
+        ))
     }
 
     #[allow(unused)]
-    fn dump(&self) -> Result<String> {
-        let version = self.version.to_owned();
-        let head = self.head.as_ref().map(opml::Head::from);
-        let body = opml::Body::from(&self.body);
-        OPML {
-            version,
-            head,
-            body,
-        }
-        .to_string()
-        .with_context(|| "Failed to dump OPML.")
+    fn try_dump(&self) -> Result<String> {
+        OPML::from(self)
+            .to_string()
+            .with_context(|| "Failed to dump OPML.")
     }
 }
 
@@ -180,21 +215,21 @@ mod test {
 
     #[test]
     fn parse_opml() {
-        let opml1 = Opml::from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
-        let opml2 = Opml::from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
+        let opml1 = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
+        let opml2 = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
         assert_eq!(format!("{:?}", opml1), format!("{:?}", opml2));
     }
 
     #[test]
     fn parse_complex_opml() {
-        let opml = Opml::from_str(&read_to_string("./OPMLs/complex.opml").unwrap()).unwrap();
+        let opml = Opml::try_from_str(&read_to_string("./OPMLs/complex.opml").unwrap()).unwrap();
         println!("{:?}", opml);
     }
 
     #[test]
     fn dump_opml() {
         let xml = read_to_string("./OPMLs/example1.opml").unwrap();
-        let opml = Opml::from_str(&xml).unwrap();
-        assert_eq!(xml, opml.dump().unwrap());
+        let opml = Opml::try_from_str(&xml).unwrap();
+        assert_eq!(xml, opml.try_dump().unwrap());
     }
 }
