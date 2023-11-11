@@ -144,7 +144,6 @@ impl TryFrom<opml::Opml> for Feed {
     fn try_from(value: opml::Opml) -> Result<Self> {
         let version = value.version;
         let head = value.head.map(Head::from);
-        let mut folders = HashSet::new();
         let mut orphans = HashSet::new();
         let mut entries_map = HashMap::new();
         let mut folders_map = HashMap::new();
@@ -174,14 +173,12 @@ impl TryFrom<opml::Opml> for Feed {
                     };
                     let folder = Rc::new(RefCell::new(folder));
                     folders_map.insert(uuid, folder.clone());
-                    folders.insert(uuid);
                 }
             }
         }
         Ok(Feed {
             head,
             version,
-            folders,
             orphans,
             folders_map,
             entries_map,
@@ -199,8 +196,6 @@ pub struct Feed {
     pub version: String,
     /// OPML head.
     pub head: Option<Head>,
-    /// IDs of feed folders.
-    pub folders: HashSet<FolderUuid>,
     /// IDs of orphan feed entries which don't belong to any folders.
     pub orphans: HashSet<EntryUuid>,
     /// Map for all entries.
@@ -322,7 +317,6 @@ impl Feed {
             .for_each(|e| {
                 self.entries_map.remove(e);
             });
-        self.folders.remove(id);
         self.folders_map.remove(id);
         Ok(())
     }
