@@ -89,22 +89,19 @@ impl Entry {
         }
     }
 
-    /// Creates an `Entry` with homepage URL of the feed.
+    /// Sets homepage URL of a entry.
     #[allow(unused)]
-    pub fn new_with_html_url(text: String, xml_url: Url, html_url: Url) -> Self {
-        Entry {
-            title: Some(text.to_owned()),
-            text,
-            html_url: Some(html_url),
-            xml_url,
-            belong_to: None,
-            uuid: Uuid::new_v4().into(),
-        }
+    pub fn set_html_url(mut self, html_url: Url) -> Self {
+        self.html_url = Some(html_url);
+        self
     }
 
     /// Set entry belongs to a folder.
-    pub fn set_belonging(&mut self, belong_to: &FolderUuid) {
+    /// > Note that this function just sets entry's belonging attribute,
+    /// > so it won't affect the folder with the id.
+    pub fn set_belonging(mut self, belong_to: &FolderUuid) -> Self {
         self.belong_to = Some(*belong_to);
+        self
     }
 }
 
@@ -158,21 +155,21 @@ impl TryFrom<opml::Opml> for Feed {
                     let uuid = Uuid::new_v4().into();
                     let mut entries = HashSet::new();
                     for e in f.entries {
-                        let mut entry =
-                            Entry::try_from(e).with_context(|| format!("At folder {}", f.text))?;
-                        entry.set_belonging(&uuid);
-                        let entry = Rc::new(entry);
+                        let entry = Rc::new(
+                            Entry::try_from(e)
+                                .with_context(|| format!("At folder {}", f.text))?
+                                .set_belonging(&uuid),
+                        );
                         entries_map.insert(entry.uuid, entry.clone());
                         entries.insert(entry.uuid);
                     }
-                    let folder = Folder {
+                    let folder = Rc::new(RefCell::new(Folder {
                         text: f.text,
                         title: f.title,
                         entries,
                         uuid,
-                    };
-                    let folder = Rc::new(RefCell::new(folder));
-                    folders_map.insert(uuid, folder.clone());
+                    }));
+                    folders_map.insert(uuid, folder);
                 }
             }
         }
@@ -207,17 +204,14 @@ pub struct Feed {
 impl Feed {
     /// Returns all folders.
     #[allow(unused)]
-    pub fn get_all_folders(&self) -> Vec<Rc<RefCell<Folder>>> {
-        self.folders_map.values().map(Rc::clone).collect()
+    pub fn get_all_folders(&self) -> impl Iterator<Item = &Rc<RefCell<Folder>>> {
+        self.folders_map.values()
     }
 
     /// Returns the IDs of all folders.
     #[allow(unused)]
-    pub fn get_all_folder_ids(&self) -> Vec<FolderUuid> {
-        self.folders_map
-            .keys()
-            .map(FolderUuid::clone)
-            .collect::<Vec<_>>()
+    pub fn get_all_folder_ids(&self) -> impl Iterator<Item = &FolderUuid> {
+        self.folders_map.keys()
     }
 
     /// Attempts to return the IDs of all entries in a folder by giving folder ID.
@@ -236,72 +230,61 @@ impl Feed {
 
     /// Returns all entries.
     #[allow(unused)]
-    pub fn get_all_entries(&self) -> Vec<Rc<Entry>> {
-        self.entries_map.values().map(Rc::clone).collect()
+    pub fn get_all_entries(&self) -> impl Iterator<Item = &Rc<Entry>> {
+        self.entries_map.values()
     }
 
     /// Returns the title and the feed url of all entries.
     #[allow(unused)]
-    pub fn get_all_entry_basic_infos(&self) -> Vec<(String, Url)> {
+    pub fn get_all_entry_basic_infos(&self) -> impl Iterator<Item = (String, Url)> + '_ {
         self.entries_map
             .values()
             .map(|e| (e.text.to_owned(), e.xml_url.to_owned()))
-            .collect()
     }
 
     /// Returns the IDs of all entries.
     #[allow(unused)]
-    pub fn get_all_entry_ids(&self) -> Vec<EntryUuid> {
-        self.entries_map.keys().map(EntryUuid::clone).collect()
+    pub fn get_all_entry_ids(&self) -> impl Iterator<Item = &EntryUuid> {
+        self.entries_map.keys()
     }
 
     /// Returns the IDs of all orphan entries.
     #[allow(unused)]
-    pub fn get_all_orphan_entry_ids(&self) -> Vec<EntryUuid> {
-        self.orphans.iter().map(EntryUuid::clone).collect()
+    pub fn get_all_orphan_entry_ids(&self) -> impl Iterator<Item = &EntryUuid> {
+        self.orphans.iter()
     }
 
     /// Attempts to return an folder by giving its ID.
     pub fn try_get_folder_by_id(&self, id: &FolderUuid) -> Result<Rc<RefCell<Folder>>> {
-        let folder = self
+        Ok(self
             .folders_map
             .get(id)
-            .with_context(|| format!("Failed to get folder by UUID `{}`", **id))?;
-        Ok(folder.clone())
+            .with_context(|| format!("Failed to get folder by UUID `{}`", **id))?
+            .clone())
     }
 
     /// Attempts to return an entry by giving its ID.
     #[allow(unused)]
     pub fn try_get_entry_by_id(&self, id: &EntryUuid) -> Result<Rc<Entry>> {
-        let entry = self
+        Ok(self
             .entries_map
             .get(id)
-            .with_context(|| format!("Failed to get entry by UUID `{}`", **id))?;
-        Ok(entry.clone())
+            .with_context(|| format!("Failed to get entry by UUID `{}`", **id))?
+            .clone())
     }
 
     /// Attempts to remove an entry by giving its ID.
     #[allow(unused)]
-    pub fn try_remove_entry_by_id(&mut self, id: &EntryUuid) -> Result<()> {
+    pub fn try_remove_entry_by_id(&mut self, id: &EntryUuid) -> Result<Rc<Entry>> {
         let entry = self.try_get_entry_by_id(id)?;
         // Belong to a folder?
         if let Some(belong_to) = &entry.belong_to {
-            let folder = self.try_get_folder_by_id(belong_to).with_context(|| {
-                format!(
-                    "Entry {} (UUID `{}`) belongs to a invalid folder.",
-                    entry.text, *entry.uuid
-                )
-            })?;
-            folder
-                .try_borrow_mut()
-                .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **belong_to))?
-                .entries
-                .remove(id);
+            self.try_remove_entry_id_from_folder_set(id, belong_to);
         } else {
             self.orphans.remove(id);
         }
         self.entries_map.remove(id);
-        Ok(())
+        Ok(entry)
     }
 
     /// Attempts to remove a folder by giving its ID.
@@ -337,14 +320,43 @@ impl Feed {
         entry: Entry,
         to_folder_uuid: &FolderUuid,
     ) -> Result<EntryUuid> {
-        let mut entry = entry;
-        let folder = self
-            .try_get_folder_by_id(to_folder_uuid)
-            .context("Failed when adding entry.")?;
-        entry.set_belonging(to_folder_uuid);
-        let entry = Rc::new(entry);
+        let entry = Rc::new(entry.set_belonging(to_folder_uuid));
         self.entries_map.insert(entry.uuid, entry.clone());
+        self.try_add_entry_id_to_folder_set(&entry.uuid, to_folder_uuid);
         Ok(entry.uuid)
+    }
+
+    fn try_remove_entry_id_from_folder_set(
+        &mut self,
+        entry_id: &EntryUuid,
+        old_folder_id: &FolderUuid,
+    ) -> Result<()> {
+        let old_folder = self.try_get_folder_by_id(old_folder_id)?;
+        old_folder
+            .try_borrow_mut()
+            .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **old_folder_id))?
+            .entries
+            .remove(entry_id);
+        Ok(())
+    }
+
+    fn try_add_entry_id_to_folder_set(
+        &mut self,
+        entry_id: &EntryUuid,
+        new_folder_id: &FolderUuid,
+    ) -> Result<()> {
+        let new_folder = self.try_get_folder_by_id(new_folder_id)?;
+        new_folder
+            .try_borrow_mut()
+            .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **new_folder_id))?
+            .entries
+            .insert(*entry_id);
+        Ok(())
+    }
+
+    unsafe fn set_entry_belonging(entry: &Rc<Entry>, to_folder_id: Option<&FolderUuid>) {
+        let entry = entry.as_ref() as *const Entry as *mut Entry;
+        (*entry).belong_to = to_folder_id.map(FolderUuid::clone);
     }
 
     /// Attempts to move an entry to another folder or make an entry orphan.
@@ -355,63 +367,64 @@ impl Feed {
         &mut self,
         entry_id: &EntryUuid,
         to_folder_id: Option<&FolderUuid>,
-    ) -> Result<()> {
-        let mut entry = self.try_get_entry_by_id(entry_id)?;
-        // Will be moved to a folder?
-        if let Some(to_folder_id) = to_folder_id {
-            // If targeted folder is invalid, just return.
-            let _ = self.try_get_folder_by_id(to_folder_id)?;
+    ) -> Result<Rc<Entry>> {
+        let entry = self.try_get_entry_by_id(entry_id)?;
+        match (&entry.belong_to, to_folder_id) {
+            // From a folder to another folder.
+            (Some(old_folder_id), Some(new_folder_id)) => {
+                // Remove from old folder.
+                self.try_remove_entry_id_from_folder_set(entry_id, old_folder_id)?;
+                // Insert to new folder.
+                self.try_add_entry_id_to_folder_set(entry_id, new_folder_id)?;
+            }
+            // From a folder to be an orphan.
+            (Some(old_folder_id), None) => {
+                // Remove from old folder.
+                self.try_remove_entry_id_from_folder_set(entry_id, old_folder_id)?;
+                self.orphans.insert(*entry_id);
+            }
+            // From an orphan to be owned by a folder.
+            (None, Some(new_folder_id)) => {
+                self.orphans.remove(entry_id);
+                // Insert to new folder.
+                self.try_add_entry_id_to_folder_set(entry_id, new_folder_id)?;
+            }
+            _ => (),
         }
-        // Belong to a folder?
-        if let Some(from_folder_id) = &entry.belong_to {
-            let from_folder = self.try_get_folder_by_id(from_folder_id)?;
-            from_folder
-                .try_borrow_mut()
-                .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **from_folder_id))?
-                .entries
-                .remove(entry_id);
-        } else if to_folder_id.is_some() {
-            // Is orphan and will be moved to a folder.
-            self.orphans.remove(entry_id);
-        } else {
-            // Is orphan and will still be orphan. Do nothing and return.
-            return Ok(());
-        }
-        // Move to targeted folder.
-        // TODO: Ugly implementation, should be changed someday.
         unsafe {
-            let mut entry = (entry.as_ref() as *const Entry as *mut Entry);
-            (*entry).belong_to = to_folder_id.map(FolderUuid::clone);
+            Self::set_entry_belonging(&entry, to_folder_id);
         }
-        // to be orphan?
-        if to_folder_id.is_none() {
-            self.orphans.insert(*entry_id);
-        }
-        Ok(())
+        Ok(entry)
     }
 
     /// Returns the IDs of all entries with matching name.
     #[allow(unused)]
-    pub fn get_entry_ids_by_name(&self, name: &str) -> Vec<EntryUuid> {
-        let mut res = vec![];
-        for (id, entry) in &self.entries_map {
+    pub fn get_entry_ids_by_name<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> impl Iterator<Item = &EntryUuid> + 'a {
+        self.entries_map.iter().filter_map(move |(id, entry)| {
             if entry.text.contains(name) {
-                res.push(*id);
+                Some(id)
+            } else {
+                None
             }
-        }
-        res
+        })
     }
 
     /// Returns the IDs of all folders with matching name.
     #[allow(unused)]
-    pub fn get_folder_ids_by_name(&self, name: &str) -> Vec<FolderUuid> {
-        let mut res = vec![];
-        for (id, folder) in &self.folders_map {
+    pub fn get_folder_ids_by_name<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> impl Iterator<Item = &FolderUuid> + 'a {
+        self.folders_map.iter().filter_map(move |(id, folder)| {
             if folder.borrow().text.contains(name) {
-                res.push(*id);
+                Some(id)
+            } else {
+                None
             }
-        }
-        res
+        })
     }
 }
 
@@ -429,11 +442,11 @@ mod test {
             "sspai".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         );
-        let entry2 = Entry::new_with_html_url(
+        let entry2 = Entry::new(
             "sspai".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
-            Url::parse("https://sspai.com").unwrap(),
-        );
+        )
+        .set_html_url(Url::parse("https://sspai.com").unwrap());
         assert_eq!(
             format!("{:?}", entry1.html_url),
             format!("{:?}", entry2.html_url)
@@ -449,7 +462,7 @@ mod test {
 
     impl Feed {
         fn get_sorted_all_entry_basic_infos(&self) -> Vec<(String, Url)> {
-            let mut names = self.get_all_entry_basic_infos();
+            let mut names = self.get_all_entry_basic_infos().collect::<Vec<_>>();
             names.sort();
             names
         }
@@ -459,9 +472,9 @@ mod test {
     fn remove_entry() {
         let opml1 = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
         let mut feed1: Feed = opml1.try_into().unwrap();
-        let found = feed1.get_entry_ids_by_name("少数派");
+        let found = *feed1.get_entry_ids_by_name("少数派").next().unwrap();
         feed1
-            .try_remove_entry_by_id(found.first().unwrap())
+            .try_remove_entry_by_id(&found)
             .unwrap();
         let opml2 = Opml::try_from_str(&read_to_string("./OPMLs/example3.opml").unwrap()).unwrap();
         let feed2: Feed = opml2.try_into().unwrap();
@@ -498,9 +511,8 @@ mod test {
             "少数派".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         );
-        let found = feed2.get_folder_ids_by_name("Software");
-        let to_folder_id = found.first().unwrap();
-        let entry_id = feed2.try_add_entry_to_folder(entry, to_folder_id).unwrap();
+        let to_folder_id = *feed2.get_folder_ids_by_name("Software").next().unwrap();
+        let entry_id = feed2.try_add_entry_to_folder(entry, &to_folder_id).unwrap();
         // Before move:
         // The newly created entry should belong to a folder.
         assert!(feed2
