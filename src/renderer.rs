@@ -4,18 +4,18 @@ use egui::{Image, Margin, RichText, Separator};
 use scraper::Html;
 use std::collections::VecDeque;
 
-enum WidgetType<'a> {
+enum WidgetType {
     Label {
         text: RichText,
     },
     Hyperlink {
         text: RichText,
-        destination: &'a str,
+        destination: String,
     },
     Image {
-        src: Option<&'a str>,
-        width: Option<&'a str>,
-        height: Option<&'a str>,
+        src: Option<String>,
+        width: Option<String>,
+        height: Option<String>,
     },
     Separator,
     Newline,
@@ -47,7 +47,7 @@ pub struct ArticleComponent<'a> {
     title: &'a str,
     link: &'a str,
     time: &'a str,
-    content: &'a str,
+    widgets: VecDeque<WidgetType>,
 }
 
 fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> egui::RichText {
@@ -81,20 +81,9 @@ impl<'a> ArticleComponent<'_> {
         time: &'a str,
         content: &'a str,
     ) -> ArticleComponent<'a> {
-        ArticleComponent {
-            channel,
-            author,
-            title,
-            link,
-            time,
-            content,
-        }
-    }
-
-    pub fn render_detail_component(&self, ctx: &egui::Context, ui: &mut egui::Ui) -> Result<()> {
-        let fragment = Html::parse_fragment(self.content);
+        let fragment = Html::parse_fragment(content);
         let mut dom_stack: Vec<_> = Vec::new();
-        let mut widget_queue: VecDeque<_> = VecDeque::new();
+        let mut widgets: VecDeque<_> = VecDeque::new();
 
         for edge in fragment.root_element().traverse() {
             match edge {
@@ -117,12 +106,12 @@ impl<'a> ArticleComponent<'_> {
                             }
                         });
                         if let Some(dest) = hyperlink_destination {
-                            widget_queue.push_back(WidgetType::Hyperlink {
+                            widgets.push_back(WidgetType::Hyperlink {
                                 text: richtext,
-                                destination: dest,
+                                destination: dest.to_owned(),
                             });
                         } else {
-                            widget_queue.push_back(WidgetType::Label { text: richtext });
+                            widgets.push_back(WidgetType::Label { text: richtext });
                         }
                     }
                     scraper::Node::Element(tag) => match tag.name() {
@@ -138,20 +127,22 @@ impl<'a> ArticleComponent<'_> {
                         }),
                         "img" => {
                             dom_stack.push(ElementType::Img);
-                            let (src, width, height) =
-                                (tag.attr("src"), tag.attr("width"), tag.attr("height"));
-                            widget_queue.push_back(WidgetType::Image { src, width, height });
+                            widgets.push_back(WidgetType::Image {
+                                src: tag.attr("src").and_then(|s| Some(s.to_owned())),
+                                width: tag.attr("width").and_then(|s| Some(s.to_owned())),
+                                height: tag.attr("height").and_then(|s| Some(s.to_owned())),
+                            });
                         }
                         "em" => dom_stack.push(ElementType::Em),
                         "strong" => dom_stack.push(ElementType::Strong),
                         "hr" => {
                             dom_stack.push(ElementType::Hr);
-                            widget_queue.push_back(WidgetType::Separator);
+                            widgets.push_back(WidgetType::Separator);
                         }
                         "code" => dom_stack.push(ElementType::Code),
                         "br" => {
                             dom_stack.push(ElementType::Br);
-                            widget_queue.push_back(WidgetType::Newline);
+                            widgets.push_back(WidgetType::Newline);
                         }
                         "pre" => dom_stack.push(ElementType::Pre),
                         _ => dom_stack.push(ElementType::Others),
@@ -166,13 +157,28 @@ impl<'a> ArticleComponent<'_> {
                             && tag.name() != "ul"
                             && tag.name() != "img"
                         {
-                            widget_queue.push_back(WidgetType::Newline);
+                            widgets.push_back(WidgetType::Newline);
                         }
                     }
                 }
             }
         }
 
+        ArticleComponent {
+            channel,
+            author,
+            title,
+            link,
+            time,
+            widgets,
+        }
+    }
+
+    fn try_get_widget_by_index(&self, idx: usize) -> Option<&WidgetType> {
+        self.widgets.get(idx)
+    }
+
+    pub fn render_detail_component(&self, ctx: &egui::Context, ui: &mut egui::Ui) -> Result<()> {
         egui::Frame::none()
             .inner_margin(Margin::symmetric(10.0, 6.0))
             .outer_margin(Margin::symmetric(
@@ -228,19 +234,22 @@ impl<'a> ArticleComponent<'_> {
                 egui::Frame::none()
                     .inner_margin(Margin::symmetric(20.0, 6.0))
                     .show(ui, |ui| {
-                        while !widget_queue.is_empty() {
+                        let widgets_num = self.widgets.len();
+                        let mut idx: usize = 0;
+                        while idx < widgets_num {
                             ui.horizontal_wrapped(|ui| loop {
-                                match widget_queue.front() {
+                                match self.try_get_widget_by_index(idx) {
                                     Some(WidgetType::Label { text: _ }) => {
                                         if let Some(WidgetType::Label { text: label }) =
-                                            widget_queue.pop_front()
+                                            self.try_get_widget_by_index(idx)
                                         {
-                                            ui.label(label);
+                                            ui.label(label.clone());
+                                            idx += 1;
                                         }
                                     }
                                     Some(WidgetType::Newline) => {
-                                        widget_queue.pop_front();
                                         ui.end_row();
+                                        idx += 1;
                                     }
                                     Some(WidgetType::Hyperlink {
                                         text: _,
@@ -249,14 +258,15 @@ impl<'a> ArticleComponent<'_> {
                                         if let Some(WidgetType::Hyperlink {
                                             text: label,
                                             destination: dest,
-                                        }) = widget_queue.pop_front()
+                                        }) = self.try_get_widget_by_index(idx)
                                         {
-                                            ui.hyperlink_to(label, dest);
+                                            ui.hyperlink_to(label.clone(), dest);
+                                            idx += 1;
                                         }
                                     }
                                     Some(WidgetType::Separator) => {
-                                        widget_queue.pop_front();
                                         ui.add(Separator::horizontal(Separator::default()));
+                                        idx += 1;
                                     }
                                     _ => break,
                                 }
@@ -266,30 +276,33 @@ impl<'a> ArticleComponent<'_> {
                                     src: _,
                                     width: _,
                                     height: _,
-                                }) = widget_queue.front()
+                                }) = self.try_get_widget_by_index(idx)
                                 {
                                     if let Some(WidgetType::Image { src, width, height }) =
-                                        widget_queue.pop_front()
+                                        self.try_get_widget_by_index(idx)
                                     {
-                                        egui_extras::install_image_loaders(ctx);
-                                        ui.add(
-                                            Image::from(src.unwrap())
-                                                .fit_to_original_size(1.0)
-                                                .max_width(match width {
-                                                    Some(width) => match width.parse::<f32>() {
-                                                        Ok(width) => width,
-                                                        _ => ui.max_rect().width(),
-                                                    },
-                                                    None => ui.max_rect().width(),
-                                                })
-                                                .max_height(match height {
-                                                    Some(height) => match height.parse::<f32>() {
-                                                        Ok(height) => height,
-                                                        _ => f32::INFINITY,
-                                                    },
-                                                    None => f32::INFINITY,
-                                                }),
-                                        );
+                                        if let Some(src) = src {
+                                            egui_extras::install_image_loaders(ctx);
+                                            ui.add(
+                                                Image::from(src)
+                                                    .fit_to_original_size(1.0)
+                                                    .max_width(match width {
+                                                        Some(width) => match width.parse::<f32>() {
+                                                            Ok(width) => width,
+                                                            _ => ui.max_rect().width(),
+                                                        },
+                                                        None => ui.max_rect().width(),
+                                                    })
+                                                    .max_height(match height {
+                                                        Some(height) => match height.parse::<f32>() {
+                                                            Ok(height) => height,
+                                                            _ => f32::INFINITY,
+                                                        },
+                                                        None => f32::INFINITY,
+                                                    }),
+                                            );
+                                        }
+                                        idx += 1;
                                     }
                                 }
                             });
