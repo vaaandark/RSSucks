@@ -1,43 +1,3 @@
-use derivative::Derivative;
-use std::{collections::BTreeMap, collections::BTreeSet, time};
-
-#[derive(Derivative, serde::Deserialize, serde::Serialize)]
-pub enum DirectoryEntry {
-    Directory(Directory),
-    Feed(Feed),
-}
-
-#[derive(Derivative, serde::Deserialize, serde::Serialize)]
-#[derivative(Eq, PartialEq, Ord, PartialOrd, Default)]
-pub struct Directory {
-    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    entries: BTreeMap<String, DirectoryEntry>,
-}
-
-impl Directory {}
-
-#[derive(Derivative, serde::Deserialize, serde::Serialize)]
-#[derivative(Eq, PartialEq, Ord, PartialOrd)]
-pub struct Feed {
-    url: String,
-
-    #[derivative(PartialEq = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    articles: BTreeSet<Article>,
-}
-
-impl Feed {}
-
-#[derive(Derivative, serde::Deserialize, serde::Serialize)]
-#[derivative(Eq, PartialEq, Ord, PartialOrd)]
-pub struct Article {
-    update_time: time::SystemTime,
-    create_time: time::SystemTime,
-    title: String,
-    content: String,
-}
-
-impl Article {}
-
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 #[serde(default)]
@@ -87,9 +47,8 @@ impl eframe::App for RSSucks {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.draw_side_panel(ctx);
-        self.draw_top_panel(ctx, frame);
         self.draw_central_panel(ctx);
     }
 }
@@ -112,20 +71,6 @@ impl RSSucks {
 
             ui.label("订阅列表");
             ui.separator();
-        });
-    }
-
-    fn draw_top_panel(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        frame.close();
-                    }
-                });
-            });
         });
     }
 
