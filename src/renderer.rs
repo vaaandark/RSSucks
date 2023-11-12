@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ego_tree::iter::Edge;
-use egui::{Image, Margin, RichText, Separator};
+use egui::{Image, Margin, RichText, Rounding, Separator};
 use scraper::Html;
 use std::collections::VecDeque;
 
@@ -201,19 +201,18 @@ impl<'a> ArticleComponent<'_> {
                 8.0,
             ))
             .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
+            .rounding(Rounding::ZERO.at_least(10.0))
             .show(ui, |ui| {
                 // Set the spacing between header and content.
-                ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 10.0);
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                 // Render header:
                 egui::Frame::none()
-                    .inner_margin(Margin::symmetric(10.0, 10.0))
-                    .outer_margin(Margin::symmetric(10.0, 10.0))
-                    .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
+                    .outer_margin(Margin::same(16.0))
+                    // .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
                     .show(ui, |ui| {
                         const HEADER_LARGE_TEXT_SIZE: f32 = 32.0;
-                        const HEADER_SMALL_TEXT_SIZE: f32 = 10.0;
-                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                        const HEADER_SMALL_TEXT_SIZE: f32 = 12.0;
 
                         ui.hyperlink_to(
                             RichText::new(self.title)
@@ -235,15 +234,10 @@ impl<'a> ArticleComponent<'_> {
                             ui.label(RichText::new("🕐 ").size(HEADER_SMALL_TEXT_SIZE));
                             ui.label(RichText::new(self.time).size(HEADER_SMALL_TEXT_SIZE));
                         });
-                        // Fill the rest empty space, to make the width of the frame the same as the outer frame.
-                        ui.allocate_space(egui::Vec2 {
-                            x: ui.max_rect().width(),
-                            y: 0.0,
-                        });
                     });
                 // Render content:
                 egui::Frame::none()
-                    .inner_margin(Margin::symmetric(20.0, 6.0))
+                    .outer_margin(Margin::symmetric(16.0, 0.0))
                     .show(ui, |ui| {
                         let widgets_num = self.widgets.len();
                         let mut idx: usize = 0;
@@ -311,7 +305,8 @@ impl<'a> ArticleComponent<'_> {
                                                             _ => f32::INFINITY,
                                                         },
                                                         None => f32::INFINITY,
-                                                    }),
+                                                    })
+                                                    .rounding(Rounding::ZERO.at_least(10.0)),
                                             );
                                         }
                                         idx += 1;
@@ -330,7 +325,7 @@ impl<'a> ArticleComponent<'_> {
 
     pub fn render_preview_component(&self, ctx: &egui::Context, ui: &mut egui::Ui) -> Result<()> {
         egui::Frame::none()
-            .inner_margin(Margin::same(16.0))
+            .inner_margin(Margin::same(32.0))
             .outer_margin(Margin::symmetric(
                 if ui.max_rect().width() > 1024.0 {
                     (ui.max_rect().width() - 1024.0) / 2.0
@@ -340,9 +335,10 @@ impl<'a> ArticleComponent<'_> {
                 8.0,
             ))
             .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
+            .rounding(Rounding::ZERO.at_least(10.0))
             .show(ui, |ui| {
                 // Set the spacing between header and content.
-                ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
+                ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                 // Render title:
                 ui.label(RichText::new(self.title).size(20.0).strong());
@@ -363,6 +359,7 @@ impl<'a> ArticleComponent<'_> {
                 // Then render images.
                 egui::ScrollArea::horizontal()
                     .auto_shrink([false; 2])
+                    .drag_to_scroll(true)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             self.widgets.iter().for_each(|widget| {
@@ -376,18 +373,14 @@ impl<'a> ArticleComponent<'_> {
                                         egui_extras::install_image_loaders(ctx);
                                         ui.add(
                                             Image::from(src)
-                                                .fit_to_exact_size(egui::Vec2::new(256.0, 128.0)),
+                                                .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
+                                                .rounding(Rounding::ZERO.at_least(10.0)),
                                         );
                                     }
                                 }
                             });
                         });
                     });
-                // Fill the rest empty space, to make the width of the frame the same as the outer frame.
-                ui.allocate_space(egui::Vec2 {
-                    x: ui.max_rect().width(),
-                    y: 0.0,
-                });
             });
         Ok(())
     }
