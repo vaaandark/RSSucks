@@ -21,6 +21,27 @@ enum WidgetType {
     Newline,
 }
 
+impl std::fmt::Debug for WidgetType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Label { text } => f.debug_struct("Label").field("text", &text.text()).finish(),
+            Self::Hyperlink { text, destination } => f
+                .debug_struct("Hyperlink")
+                .field("text", &text.text())
+                .field("destination", destination)
+                .finish(),
+            Self::Image { src, width, height } => f
+                .debug_struct("Image")
+                .field("src", src)
+                .field("width", width)
+                .field("height", height)
+                .finish(),
+            Self::Separator => write!(f, "Separator"),
+            Self::Newline => write!(f, "Newline"),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 enum ElementType<'a> {
     P,
@@ -38,7 +59,6 @@ enum ElementType<'a> {
     Code,
     Br,
     Pre,
-    Others,
 }
 
 pub struct ArticleComponent<'a> {
@@ -56,24 +76,21 @@ pub struct ArticleComponent<'a> {
 }
 
 fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> egui::RichText {
-    let richtext =
-        dom_stack
-            .iter()
-            .fold(
-                egui::RichText::new(text).size(16.0),
-                |richtext, element| match element {
-                    ElementType::H1 => richtext.strong().size(32.0),
-                    ElementType::H2 => richtext.strong().size(24.0),
-                    ElementType::H3 => richtext.strong().size(18.72),
-                    ElementType::H4 => richtext.strong().size(16.0),
-                    ElementType::H5 => richtext.strong().size(13.28),
-                    ElementType::H6 => richtext.strong().size(10.72),
-                    ElementType::Em => richtext.italics(),
-                    ElementType::Strong => richtext.strong(),
-                    ElementType::Code => richtext.code(),
-                    _ => richtext,
-                },
-            );
+    let richtext = dom_stack.iter().fold(
+        egui::RichText::new(text).size(16.0).line_height(Some(28.0)),
+        |richtext, element| match element {
+            ElementType::H1 => richtext.strong().size(32.0),
+            ElementType::H2 => richtext.strong().size(24.0),
+            ElementType::H3 => richtext.strong().size(18.72),
+            ElementType::H4 => richtext.strong().size(16.0),
+            ElementType::H5 => richtext.strong().size(13.28),
+            ElementType::H6 => richtext.strong().size(10.72),
+            ElementType::Em => richtext.italics(),
+            ElementType::Strong => richtext.strong(),
+            ElementType::Code => richtext.code(),
+            _ => richtext,
+        },
+    );
     richtext
 }
 
@@ -93,78 +110,87 @@ impl<'a> ArticleComponent<'_> {
 
         for edge in fragment.root_element().traverse() {
             match edge {
-                Edge::Open(node) => match node.value() {
-                    scraper::Node::Text(text) => {
-                        let text = if !dom_stack.contains(&ElementType::Pre) {
-                            text.replace('\n', "")
-                        } else {
-                            text.to_string()
-                        };
-                        if text.is_empty() {
-                            continue;
-                        }
-                        fulltext += &text;
-                        let richtext = richtext_generator(&text, &dom_stack);
-                        let hyperlink_destination = dom_stack.iter().fold(None, |dest, element| {
-                            if let &ElementType::A { destination } = element {
-                                destination
+                Edge::Open(node) => {
+                    // println!("Open: {:?}", node.value());
+                    match node.value() {
+                        scraper::Node::Text(text) => {
+                            let text = if !dom_stack.contains(&ElementType::Pre) {
+                                text.replace('\n', "")
                             } else {
-                                dest
+                                text.to_string()
+                            };
+                            if text.is_empty() {
+                                continue;
                             }
-                        });
-                        if let Some(dest) = hyperlink_destination {
-                            widgets.push_back(WidgetType::Hyperlink {
-                                text: richtext,
-                                destination: dest.to_owned(),
-                            });
-                        } else {
-                            widgets.push_back(WidgetType::Label { text: richtext });
+                            fulltext += &text;
+                            let richtext = richtext_generator(&text, &dom_stack);
+                            let hyperlink_destination =
+                                dom_stack.iter().fold(None, |dest, element| {
+                                    if let &ElementType::A { destination } = element {
+                                        destination
+                                    } else {
+                                        dest
+                                    }
+                                });
+                            if let Some(dest) = hyperlink_destination {
+                                widgets.push_back(WidgetType::Hyperlink {
+                                    text: richtext,
+                                    destination: dest.to_owned(),
+                                });
+                            } else {
+                                widgets.push_back(WidgetType::Label { text: richtext });
+                            }
                         }
+                        scraper::Node::Element(tag) => match tag.name() {
+                            "p" => dom_stack.push(ElementType::P),
+                            "h1" => dom_stack.push(ElementType::H1),
+                            "h2" => dom_stack.push(ElementType::H2),
+                            "h3" => dom_stack.push(ElementType::H3),
+                            "h4" => dom_stack.push(ElementType::H4),
+                            "h5" => dom_stack.push(ElementType::H5),
+                            "h6" => dom_stack.push(ElementType::H6),
+                            "a" => dom_stack.push(ElementType::A {
+                                destination: tag.attr("href"),
+                            }),
+                            "img" => {
+                                dom_stack.push(ElementType::Img);
+                                widgets.push_back(WidgetType::Image {
+                                    src: tag.attr("src").map(|s| s.to_owned()),
+                                    width: tag.attr("width").map(|s| s.to_owned()),
+                                    height: tag.attr("height").map(|s| s.to_owned()),
+                                });
+                            }
+                            "em" => dom_stack.push(ElementType::Em),
+                            "strong" => dom_stack.push(ElementType::Strong),
+                            "hr" => {
+                                dom_stack.push(ElementType::Hr);
+                                widgets.push_back(WidgetType::Separator);
+                            }
+                            "code" => dom_stack.push(ElementType::Code),
+                            "br" => {
+                                dom_stack.push(ElementType::Br);
+                                widgets.push_back(WidgetType::Newline);
+                            }
+                            "pre" => dom_stack.push(ElementType::Pre),
+                            _ => {}
+                        },
+                        _ => {}
                     }
-                    scraper::Node::Element(tag) => match tag.name() {
-                        "p" => dom_stack.push(ElementType::P),
-                        "h1" => dom_stack.push(ElementType::H1),
-                        "h2" => dom_stack.push(ElementType::H2),
-                        "h3" => dom_stack.push(ElementType::H3),
-                        "h4" => dom_stack.push(ElementType::H4),
-                        "h5" => dom_stack.push(ElementType::H5),
-                        "h6" => dom_stack.push(ElementType::H6),
-                        "a" => dom_stack.push(ElementType::A {
-                            destination: tag.attr("href"),
-                        }),
-                        "img" => {
-                            dom_stack.push(ElementType::Img);
-                            widgets.push_back(WidgetType::Image {
-                                src: tag.attr("src").and_then(|s| Some(s.to_owned())),
-                                width: tag.attr("width").and_then(|s| Some(s.to_owned())),
-                                height: tag.attr("height").and_then(|s| Some(s.to_owned())),
-                            });
-                        }
-                        "em" => dom_stack.push(ElementType::Em),
-                        "strong" => dom_stack.push(ElementType::Strong),
-                        "hr" => {
-                            dom_stack.push(ElementType::Hr);
-                            widgets.push_back(WidgetType::Separator);
-                        }
-                        "code" => dom_stack.push(ElementType::Code),
-                        "br" => {
-                            dom_stack.push(ElementType::Br);
-                            widgets.push_back(WidgetType::Newline);
-                        }
-                        "pre" => dom_stack.push(ElementType::Pre),
-                        _ => dom_stack.push(ElementType::Others),
-                    },
-                    _ => {}
-                },
+                }
 
                 Edge::Close(node) => {
+                    // println!("Close: {:?}", node.value());
                     if let scraper::Node::Element(tag) = node.value() {
-                        dom_stack.pop();
-                        if (dom_stack.len() == 1 || tag.name() == "li")
-                            && tag.name() != "ul"
-                            && tag.name() != "img"
-                        {
-                            widgets.push_back(WidgetType::Newline);
+                        match tag.name() {
+                            "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "a" | "img" | "em"
+                            | "strong" | "hr" | "code" | "br" | "pre" => {
+                                // println!("{:?}", dom_stack);
+                                dom_stack.pop();
+                                if dom_stack.is_empty() || tag.name() == "li" {
+                                    widgets.push_back(WidgetType::Newline);
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -204,7 +230,7 @@ impl<'a> ArticleComponent<'_> {
             .rounding(Rounding::ZERO.at_least(10.0))
             .show(ui, |ui| {
                 // Set the spacing between header and content.
-                ui.spacing_mut().item_spacing = egui::vec2(0.0, 10.0);
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                 // Render header:
                 egui::Frame::none()
@@ -235,90 +261,96 @@ impl<'a> ArticleComponent<'_> {
                             ui.label(RichText::new(self.time).size(HEADER_SMALL_TEXT_SIZE));
                         });
                     });
+                ui.separator();
                 // Render content:
-                egui::Frame::none()
-                    .outer_margin(Margin::symmetric(16.0, 0.0))
-                    .show(ui, |ui| {
-                        let widgets_num = self.widgets.len();
-                        let mut idx: usize = 0;
-                        while idx < widgets_num {
-                            ui.horizontal_wrapped(|ui| loop {
-                                match self.try_get_widget_by_index(idx) {
-                                    Some(WidgetType::Label { text: _ }) => {
-                                        if let Some(WidgetType::Label { text: label }) =
+                // println!("{:?}", self.widgets);
+                ui.scope(|ui| {
+                    egui::Frame::none()
+                        .outer_margin(Margin::symmetric(16.0, 4.0))
+                        .show(ui, |ui| {
+                            ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
+                            let widgets_num = self.widgets.len();
+                            let mut idx: usize = 0;
+                            while idx < widgets_num {
+                                ui.horizontal_wrapped(|ui| loop {
+                                    match self.try_get_widget_by_index(idx) {
+                                        Some(WidgetType::Label { text: _ }) => {
+                                            if let Some(WidgetType::Label { text: label }) =
+                                                self.try_get_widget_by_index(idx)
+                                            {
+                                                ui.label(label.clone());
+                                                idx += 1;
+                                            }
+                                        }
+                                        Some(WidgetType::Newline) => {
+                                            ui.end_row();
+                                            idx += 1;
+                                        }
+                                        Some(WidgetType::Hyperlink {
+                                            text: _,
+                                            destination: _,
+                                        }) => {
+                                            if let Some(WidgetType::Hyperlink {
+                                                text: label,
+                                                destination: dest,
+                                            }) = self.try_get_widget_by_index(idx)
+                                            {
+                                                ui.hyperlink_to(label.clone(), dest);
+                                                idx += 1;
+                                            }
+                                        }
+                                        Some(WidgetType::Separator) => {
+                                            ui.add(Separator::horizontal(Separator::default()));
+                                            idx += 1;
+                                        }
+                                        _ => break,
+                                    }
+                                });
+                                ui.horizontal_wrapped(|ui| {
+                                    while let Some(WidgetType::Image {
+                                        src: _,
+                                        width: _,
+                                        height: _,
+                                    }) = self.try_get_widget_by_index(idx)
+                                    {
+                                        if let Some(WidgetType::Image { src, width, height }) =
                                             self.try_get_widget_by_index(idx)
                                         {
-                                            ui.label(label.clone());
+                                            if let Some(src) = src {
+                                                egui_extras::install_image_loaders(ctx);
+                                                ui.add(
+                                                    Image::from(src)
+                                                        .fit_to_original_size(1.0)
+                                                        .max_width(match width {
+                                                            Some(width) => {
+                                                                match width.parse::<f32>() {
+                                                                    Ok(width) => width,
+                                                                    _ => ui.max_rect().width(),
+                                                                }
+                                                            }
+                                                            None => ui.max_rect().width(),
+                                                        })
+                                                        .max_height(match height {
+                                                            Some(height) => {
+                                                                match height.parse::<f32>() {
+                                                                    Ok(height) => height,
+                                                                    _ => f32::INFINITY,
+                                                                }
+                                                            }
+                                                            None => f32::INFINITY,
+                                                        })
+                                                        .rounding(Rounding::ZERO.at_least(10.0))
+                                                        .show_loading_spinner(true),
+                                                );
+                                            }
                                             idx += 1;
                                         }
                                     }
-                                    Some(WidgetType::Newline) => {
-                                        ui.end_row();
-                                        idx += 1;
-                                    }
-                                    Some(WidgetType::Hyperlink {
-                                        text: _,
-                                        destination: _,
-                                    }) => {
-                                        if let Some(WidgetType::Hyperlink {
-                                            text: label,
-                                            destination: dest,
-                                        }) = self.try_get_widget_by_index(idx)
-                                        {
-                                            ui.hyperlink_to(label.clone(), dest);
-                                            idx += 1;
-                                        }
-                                    }
-                                    Some(WidgetType::Separator) => {
-                                        ui.add(Separator::horizontal(Separator::default()));
-                                        idx += 1;
-                                    }
-                                    _ => break,
-                                }
-                            });
-                            ui.horizontal_wrapped(|ui| {
-                                while let Some(WidgetType::Image {
-                                    src: _,
-                                    width: _,
-                                    height: _,
-                                }) = self.try_get_widget_by_index(idx)
-                                {
-                                    if let Some(WidgetType::Image { src, width, height }) =
-                                        self.try_get_widget_by_index(idx)
-                                    {
-                                        if let Some(src) = src {
-                                            egui_extras::install_image_loaders(ctx);
-                                            ui.add(
-                                                Image::from(src)
-                                                    .fit_to_original_size(1.0)
-                                                    .max_width(match width {
-                                                        Some(width) => match width.parse::<f32>() {
-                                                            Ok(width) => width,
-                                                            _ => ui.max_rect().width(),
-                                                        },
-                                                        None => ui.max_rect().width(),
-                                                    })
-                                                    .max_height(match height {
-                                                        Some(height) => match height.parse::<f32>()
-                                                        {
-                                                            Ok(height) => height,
-                                                            _ => f32::INFINITY,
-                                                        },
-                                                        None => f32::INFINITY,
-                                                    })
-                                                    .rounding(Rounding::ZERO.at_least(10.0)),
-                                            );
-                                        }
-                                        idx += 1;
-                                    }
-                                }
-                            });
-                        }
-                        ui.allocate_space(egui::Vec2 {
-                            x: ui.max_rect().width(),
-                            y: 0.0,
+                                    ui.end_row();
+                                });
+                            }
                         });
-                    });
+                });
             });
         Ok(())
     }
@@ -364,19 +396,18 @@ impl<'a> ArticleComponent<'_> {
                         ui.horizontal(|ui| {
                             self.widgets.iter().for_each(|widget| {
                                 if let WidgetType::Image {
-                                    src,
+                                    src: Some(src),
                                     width: _,
                                     height: _,
                                 } = widget
                                 {
-                                    if let Some(src) = src {
-                                        egui_extras::install_image_loaders(ctx);
-                                        ui.add(
-                                            Image::from(src)
-                                                .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
-                                                .rounding(Rounding::ZERO.at_least(10.0)),
-                                        );
-                                    }
+                                    egui_extras::install_image_loaders(ctx);
+                                    ui.add(
+                                        Image::from(src)
+                                            .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
+                                            .rounding(Rounding::ZERO.at_least(10.0))
+                                            .show_loading_spinner(true),
+                                    );
                                 }
                             });
                         });
