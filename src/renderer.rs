@@ -110,81 +110,75 @@ impl<'a> ArticleComponent<'_> {
 
         for edge in fragment.root_element().traverse() {
             match edge {
-                Edge::Open(node) => {
-                    // println!("Open: {:?}", node.value());
-                    match node.value() {
-                        scraper::Node::Text(text) => {
-                            let text = if !dom_stack.contains(&ElementType::Pre) {
-                                text.replace('\n', "")
-                            } else {
-                                text.to_string()
-                            };
-                            if text.is_empty() {
-                                continue;
-                            }
-                            fulltext += &text;
-                            let richtext = richtext_generator(&text, &dom_stack);
-                            let hyperlink_destination =
-                                dom_stack.iter().fold(None, |dest, element| {
-                                    if let &ElementType::A { destination } = element {
-                                        destination
-                                    } else {
-                                        dest
-                                    }
-                                });
-                            if let Some(dest) = hyperlink_destination {
-                                widgets.push_back(WidgetType::Hyperlink {
-                                    text: richtext,
-                                    destination: dest.to_owned(),
-                                });
-                            } else {
-                                widgets.push_back(WidgetType::Label { text: richtext });
-                            }
+                Edge::Open(node) => match node.value() {
+                    scraper::Node::Text(text) => {
+                        let text = if !dom_stack.contains(&ElementType::Pre) {
+                            text.replace('\n', "")
+                        } else {
+                            text.to_string()
+                        };
+                        if text.is_empty() {
+                            continue;
                         }
-                        scraper::Node::Element(tag) => match tag.name() {
-                            "p" => dom_stack.push(ElementType::P),
-                            "h1" => dom_stack.push(ElementType::H1),
-                            "h2" => dom_stack.push(ElementType::H2),
-                            "h3" => dom_stack.push(ElementType::H3),
-                            "h4" => dom_stack.push(ElementType::H4),
-                            "h5" => dom_stack.push(ElementType::H5),
-                            "h6" => dom_stack.push(ElementType::H6),
-                            "a" => dom_stack.push(ElementType::A {
-                                destination: tag.attr("href"),
-                            }),
-                            "img" => {
-                                dom_stack.push(ElementType::Img);
-                                widgets.push_back(WidgetType::Image {
-                                    src: tag.attr("src").map(|s| s.to_owned()),
-                                    width: tag.attr("width").map(|s| s.to_owned()),
-                                    height: tag.attr("height").map(|s| s.to_owned()),
-                                });
+                        fulltext += &text;
+                        let richtext = richtext_generator(&text, &dom_stack);
+                        let hyperlink_destination = dom_stack.iter().fold(None, |dest, element| {
+                            if let &ElementType::A { destination } = element {
+                                destination
+                            } else {
+                                dest
                             }
-                            "em" => dom_stack.push(ElementType::Em),
-                            "strong" => dom_stack.push(ElementType::Strong),
-                            "hr" => {
-                                dom_stack.push(ElementType::Hr);
-                                widgets.push_back(WidgetType::Separator);
-                            }
-                            "code" => dom_stack.push(ElementType::Code),
-                            "br" => {
-                                dom_stack.push(ElementType::Br);
-                                widgets.push_back(WidgetType::Newline);
-                            }
-                            "pre" => dom_stack.push(ElementType::Pre),
-                            _ => {}
-                        },
-                        _ => {}
+                        });
+                        if let Some(dest) = hyperlink_destination {
+                            widgets.push_back(WidgetType::Hyperlink {
+                                text: richtext,
+                                destination: dest.to_owned(),
+                            });
+                        } else {
+                            widgets.push_back(WidgetType::Label { text: richtext });
+                        }
                     }
-                }
+                    scraper::Node::Element(tag) => match tag.name() {
+                        "p" => dom_stack.push(ElementType::P),
+                        "h1" => dom_stack.push(ElementType::H1),
+                        "h2" => dom_stack.push(ElementType::H2),
+                        "h3" => dom_stack.push(ElementType::H3),
+                        "h4" => dom_stack.push(ElementType::H4),
+                        "h5" => dom_stack.push(ElementType::H5),
+                        "h6" => dom_stack.push(ElementType::H6),
+                        "a" => dom_stack.push(ElementType::A {
+                            destination: tag.attr("href"),
+                        }),
+                        "img" => {
+                            dom_stack.push(ElementType::Img);
+                            widgets.push_back(WidgetType::Image {
+                                src: tag.attr("src").map(|s| s.to_owned()),
+                                width: tag.attr("width").map(|s| s.to_owned()),
+                                height: tag.attr("height").map(|s| s.to_owned()),
+                            });
+                        }
+                        "em" => dom_stack.push(ElementType::Em),
+                        "strong" => dom_stack.push(ElementType::Strong),
+                        "hr" => {
+                            dom_stack.push(ElementType::Hr);
+                            widgets.push_back(WidgetType::Separator);
+                        }
+                        "code" => dom_stack.push(ElementType::Code),
+                        "br" => {
+                            dom_stack.push(ElementType::Br);
+                            widgets.push_back(WidgetType::Newline);
+                        }
+                        "pre" => dom_stack.push(ElementType::Pre),
+                        _ => {}
+                    },
+                    _ => {}
+                },
 
                 Edge::Close(node) => {
-                    // println!("Close: {:?}", node.value());
                     if let scraper::Node::Element(tag) = node.value() {
                         match tag.name() {
                             "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "a" | "img" | "em"
                             | "strong" | "hr" | "code" | "br" | "pre" => {
-                                // println!("{:?}", dom_stack);
                                 dom_stack.pop();
                                 if dom_stack.is_empty() || tag.name() == "li" {
                                     widgets.push_back(WidgetType::Newline);
@@ -263,7 +257,6 @@ impl<'a> ArticleComponent<'_> {
                     });
                 ui.separator();
                 // Render content:
-                // println!("{:?}", self.widgets);
                 ui.scope(|ui| {
                     egui::Frame::none()
                         .outer_margin(Margin::symmetric(16.0, 4.0))
@@ -324,7 +317,10 @@ impl<'a> ArticleComponent<'_> {
                                                         .max_width(match width {
                                                             Some(width) => {
                                                                 match width.parse::<f32>() {
-                                                                    Ok(width) => width,
+                                                                    Ok(width) => f32::min(
+                                                                        width,
+                                                                        ui.max_rect().width(),
+                                                                    ),
                                                                     _ => ui.max_rect().width(),
                                                                 }
                                                             }
