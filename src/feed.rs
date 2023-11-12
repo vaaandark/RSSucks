@@ -61,18 +61,19 @@ impl From<opml::Head> for Head {
 #[derive(Debug)]
 pub struct Entry {
     /// The title of the feed.
-    pub text: String,
-    /// Also the title.
-    pub title: Option<String>,
+    text: String,
+    /// Also the title, can be `None`,
+    /// for compatibility with the OPML standard.
+    title: Option<String>,
     /// URL of the RSS feed.
     pub xml_url: Url,
     /// Homepage URL of the feed.
     pub html_url: Option<Url>,
     /// The UUID of the folder to which this entry belongs.
     /// > Note that if it's `None`, it belongs to no folder and is called **orphan** entry.
-    pub belong_to: Option<FolderUuid>,
+    belong_to: Option<FolderUuid>,
     /// UUID of this feed.
-    pub uuid: EntryUuid,
+    uuid: EntryUuid,
 }
 
 impl Entry {
@@ -103,6 +104,19 @@ impl Entry {
         self.belong_to = Some(*belong_to);
         self
     }
+
+    /// Returns the title of the folder.
+    pub fn title(&self) -> &str {
+        &self.text
+    }
+
+    /// Set the title of the folder.
+    pub fn rename(&mut self, name: String) {
+        if self.title.is_some() {
+            self.title = Some(name.to_owned());
+        }
+        self.text = name;
+    }
 }
 
 impl TryFrom<opml::Entry> for Entry {
@@ -127,13 +141,35 @@ impl TryFrom<opml::Entry> for Entry {
 #[derive(Debug)]
 pub struct Folder {
     /// The title of the feed.
-    pub text: String,
-    /// Also the title, can be `None`.
-    pub title: Option<String>,
+    text: String,
+    /// Also the title, can be `None`,
+    /// for compatibility with the OPML standard.
+    title: Option<String>,
     /// The IDs of entries which belong to this folder.
-    pub entries: HashSet<EntryUuid>,
+    entries: HashSet<EntryUuid>,
     /// UUID of this feed folder.
-    pub uuid: FolderUuid,
+    uuid: FolderUuid,
+}
+
+impl Folder {
+    /// Returns the title of the folder.
+    pub fn title(&self) -> &str {
+        &self.text
+    }
+
+    /// Set the title of the folder.
+    pub fn rename(&mut self, name: String) {
+        if self.title.is_some() {
+            self.title = Some(name.to_owned());
+        }
+        self.text = name;
+    }
+
+    /// Returns the IDs of all entries in the folder.
+    #[allow(unused)]
+    pub fn get_entry_ids(&self) -> impl Iterator<Item = &EntryUuid> {
+        self.entries.iter()
+    }
 }
 
 impl TryFrom<opml::Opml> for Feed {
@@ -194,11 +230,11 @@ pub struct Feed {
     /// OPML head.
     pub head: Option<Head>,
     /// IDs of orphan feed entries which don't belong to any folders.
-    pub orphans: HashSet<EntryUuid>,
+    orphans: HashSet<EntryUuid>,
     /// Map for all entries.
-    pub entries_map: HashMap<EntryUuid, Rc<Entry>>,
+    entries_map: HashMap<EntryUuid, Rc<Entry>>,
     /// Map for all folders.
-    pub folders_map: HashMap<FolderUuid, Rc<RefCell<Folder>>>,
+    folders_map: HashMap<FolderUuid, Rc<RefCell<Folder>>>,
 }
 
 impl Feed {
@@ -212,20 +248,6 @@ impl Feed {
     #[allow(unused)]
     pub fn get_all_folder_ids(&self) -> impl Iterator<Item = &FolderUuid> {
         self.folders_map.keys()
-    }
-
-    /// Attempts to return the IDs of all entries in a folder by giving folder ID.
-    #[allow(unused)]
-    pub fn try_get_entry_ids_by_folder_id(&self, folder_id: &FolderUuid) -> Result<Vec<EntryUuid>> {
-        let folder = self.try_get_folder_by_id(folder_id)?;
-        let entries = folder
-            .try_borrow_mut()
-            .with_context(|| format!("Failed to borrow folder (UUID `{}`).", **folder_id))?
-            .entries
-            .iter()
-            .map(EntryUuid::clone)
-            .collect();
-        Ok(entries)
     }
 
     /// Returns all entries.
@@ -426,6 +448,23 @@ impl Feed {
             }
         })
     }
+
+    /// Updates a entry with new one by giving its ID,
+    /// and the old one will be overwritten.
+    #[allow(unused)]
+    pub fn try_update_entry_by_id(
+        &mut self,
+        id: &EntryUuid,
+        mut new_entry: Entry,
+    ) -> Result<Rc<Entry>> {
+        let old_entry = self.try_get_entry_by_id(id)?;
+        new_entry.belong_to = old_entry.belong_to;
+        new_entry.uuid = *id;
+        self.entries_map.remove(id);
+        let entry = Rc::new(new_entry);
+        self.entries_map.insert(*id, entry.clone());
+        Ok(entry)
+    }
 }
 
 #[cfg(test)]
@@ -455,6 +494,24 @@ mod test {
     }
 
     #[test]
+    fn list_entries_in_folder() {
+        let opml = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
+        let feed = Feed::try_from(opml).unwrap();
+        let folder_id = feed.get_folder_ids_by_name("Software").next().unwrap();
+        let mut names = feed
+            .try_get_folder_by_id(folder_id)
+            .unwrap()
+            .borrow()
+            .get_entry_ids()
+            .map(|id| feed.try_get_entry_by_id(id).unwrap().text.to_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        let mut expect = vec!["小众软件", "异次元软件世界"];
+        expect.sort();
+        assert_eq!(expect, names);
+    }
+
+    #[test]
     fn parse_opml() {
         let opml = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
         Feed::try_from(opml).unwrap();
@@ -473,9 +530,7 @@ mod test {
         let opml1 = Opml::try_from_str(&read_to_string("./OPMLs/example1.opml").unwrap()).unwrap();
         let mut feed1: Feed = opml1.try_into().unwrap();
         let found = *feed1.get_entry_ids_by_name("少数派").next().unwrap();
-        feed1
-            .try_remove_entry_by_id(&found)
-            .unwrap();
+        feed1.try_remove_entry_by_id(&found).unwrap();
         let opml2 = Opml::try_from_str(&read_to_string("./OPMLs/example3.opml").unwrap()).unwrap();
         let feed2: Feed = opml2.try_into().unwrap();
         assert_eq!(
