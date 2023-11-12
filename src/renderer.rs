@@ -48,6 +48,11 @@ pub struct ArticleComponent<'a> {
     link: &'a str,
     time: &'a str,
     widgets: VecDeque<WidgetType>,
+    // For preview
+    max_rows: usize,
+    break_anywhere: bool,
+    overflow_character: Option<char>,
+    fulltext: String,
 }
 
 fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> egui::RichText {
@@ -84,6 +89,7 @@ impl<'a> ArticleComponent<'_> {
         let fragment = Html::parse_fragment(content);
         let mut dom_stack: Vec<_> = Vec::new();
         let mut widgets: VecDeque<_> = VecDeque::new();
+        let mut fulltext = String::new();
 
         for edge in fragment.root_element().traverse() {
             match edge {
@@ -97,6 +103,7 @@ impl<'a> ArticleComponent<'_> {
                         if text.is_empty() {
                             continue;
                         }
+                        fulltext += &text;
                         let richtext = richtext_generator(&text, &dom_stack);
                         let hyperlink_destination = dom_stack.iter().fold(None, |dest, element| {
                             if let &ElementType::A { destination } = element {
@@ -171,6 +178,10 @@ impl<'a> ArticleComponent<'_> {
             link,
             time,
             widgets,
+            max_rows: 3,
+            break_anywhere: true,
+            overflow_character: Some('…'),
+            fulltext,
         }
     }
 
@@ -180,14 +191,14 @@ impl<'a> ArticleComponent<'_> {
 
     pub fn render_detail_component(&self, ctx: &egui::Context, ui: &mut egui::Ui) -> Result<()> {
         egui::Frame::none()
-            .inner_margin(Margin::symmetric(10.0, 6.0))
+            .inner_margin(Margin::same(16.0))
             .outer_margin(Margin::symmetric(
-                if ui.max_rect().width() >= 1200.0 {
-                    (ui.max_rect().width() - 1200.0) / 2.0
+                if ui.max_rect().width() > 1024.0 {
+                    (ui.max_rect().width() - 1024.0) / 2.0
                 } else {
                     0.0
                 },
-                6.0,
+                8.0,
             ))
             .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
             .show(ui, |ui| {
@@ -294,7 +305,8 @@ impl<'a> ArticleComponent<'_> {
                                                         None => ui.max_rect().width(),
                                                     })
                                                     .max_height(match height {
-                                                        Some(height) => match height.parse::<f32>() {
+                                                        Some(height) => match height.parse::<f32>()
+                                                        {
                                                             Ok(height) => height,
                                                             _ => f32::INFINITY,
                                                         },
@@ -312,6 +324,70 @@ impl<'a> ArticleComponent<'_> {
                             y: 0.0,
                         });
                     });
+            });
+        Ok(())
+    }
+
+    pub fn render_preview_component(&self, ctx: &egui::Context, ui: &mut egui::Ui) -> Result<()> {
+        egui::Frame::none()
+            .inner_margin(Margin::same(16.0))
+            .outer_margin(Margin::symmetric(
+                if ui.max_rect().width() > 1024.0 {
+                    (ui.max_rect().width() - 1024.0) / 2.0
+                } else {
+                    0.0
+                },
+                8.0,
+            ))
+            .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
+            .show(ui, |ui| {
+                // Set the spacing between header and content.
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+                // Render title:
+                ui.label(RichText::new(self.title).size(20.0).strong());
+
+                // Render content:
+                // First, render text.
+                let mut job = egui::text::LayoutJob::single_section(
+                    self.fulltext.clone(),
+                    egui::TextFormat::default(),
+                );
+                job.wrap = egui::text::TextWrapping {
+                    max_rows: self.max_rows,
+                    break_anywhere: self.break_anywhere,
+                    overflow_character: self.overflow_character,
+                    ..Default::default()
+                };
+                ui.label(job);
+                // Then render images.
+                egui::ScrollArea::horizontal()
+                    .auto_shrink([false; 2])
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            self.widgets.iter().for_each(|widget| {
+                                if let WidgetType::Image {
+                                    src,
+                                    width: _,
+                                    height: _,
+                                } = widget
+                                {
+                                    if let Some(src) = src {
+                                        egui_extras::install_image_loaders(ctx);
+                                        ui.add(
+                                            Image::from(src)
+                                                .fit_to_exact_size(egui::Vec2::new(256.0, 128.0)),
+                                        );
+                                    }
+                                }
+                            });
+                        });
+                    });
+                // Fill the rest empty space, to make the width of the frame the same as the outer frame.
+                ui.allocate_space(egui::Vec2 {
+                    x: ui.max_rect().width(),
+                    y: 0.0,
+                });
             });
         Ok(())
     }
