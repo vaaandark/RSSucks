@@ -3,4 +3,5 @@
 mod app;
 pub mod feed;
 pub mod opml;
+mod article;
 pub use app::RSSucks;
