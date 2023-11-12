@@ -87,9 +87,8 @@ impl eframe::App for RSSucks {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.draw_side_panel(ctx);
-        self.draw_top_panel(ctx, frame);
         self.draw_central_panel(ctx);
     }
 }
@@ -112,20 +111,6 @@ impl RSSucks {
 
             ui.label("订阅列表");
             ui.separator();
-        });
-    }
-
-    fn draw_top_panel(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        frame.close();
-                    }
-                });
-            });
         });
     }
 
