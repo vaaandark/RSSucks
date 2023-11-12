@@ -1,15 +1,16 @@
 //! Data structures and operating interfaces for Rss feeds.
 use crate::opml;
 use anyhow::{Context, Error, Ok, Result};
-use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use url::Url;
 use uuid::Uuid;
 
 /// Universally Unique Identifier for [`Entry`].
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EntryUuid(Uuid);
 
 impl Deref for EntryUuid {
@@ -26,7 +27,7 @@ impl From<Uuid> for EntryUuid {
 }
 
 /// Universally Unique Identifier for [`Folder`].
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FolderUuid(Uuid);
 
 impl Deref for FolderUuid {
@@ -44,7 +45,7 @@ impl From<Uuid> for FolderUuid {
 
 /// OPML head information,
 /// which can be converted from [`opml::Head`].
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Head {
     pub title: Option<String>,
 }
@@ -58,7 +59,7 @@ impl From<opml::Head> for Head {
 /// Feed entry, the basic unit for getting subsciptions from feed,
 /// which can be converted from [`opml::Entry`] (see [`Entry::try_from`]).
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Entry {
     /// The title of the feed.
     text: String,
@@ -138,7 +139,7 @@ impl TryFrom<opml::Entry> for Entry {
 /// A folder for containing a series of subscriptions on similar topics,
 /// which can **not** be converted from [`opml::Folder`] directly.
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Folder {
     /// The title of the feed.
     text: String,
@@ -223,7 +224,7 @@ impl TryFrom<opml::Opml> for Feed {
 /// which contains orphan entries directly and folders with entries inside.
 /// Feed can be converted from [`opml::Opml`].
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Feed {
     /// OPML version.
     pub version: String,
