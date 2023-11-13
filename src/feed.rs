@@ -233,7 +233,7 @@ impl TryFrom<opml::Opml> for Feed {
     }
 }
 
-type ArticlesMap = Arc<Mutex<BTreeMap<ArticleUuid, Arc<Mutex<RefCell<Article>>>>>>;
+type ArticlesMap = Arc<Mutex<BTreeMap<ArticleUuid, Arc<Mutex<Article>>>>>;
 
 /// Main data structure for RSS feeds,
 /// which contains orphan entries directly and folders with entries inside.
@@ -510,9 +510,9 @@ impl Feed {
                         .expect("Failed to get the lock on article map")
                         .insert(
                             article_id,
-                            Arc::new(Mutex::new(RefCell::new(
+                            Arc::new(Mutex::new(
                                 Article::from(item.to_owned()).set_belonging(&entry_uuid),
-                            ))),
+                            )),
                         );
                 }
             });
@@ -543,7 +543,7 @@ impl Feed {
 
     /// Attempts to return the article by giveing its ID.
     #[allow(unused)]
-    pub fn try_get_article_by_id(&self, id: &ArticleUuid) -> Result<Arc<Mutex<RefCell<Article>>>> {
+    pub fn try_get_article_by_id(&self, id: &ArticleUuid) -> Result<Arc<Mutex<Article>>> {
         Ok(self
             .articles_map
             .lock()
