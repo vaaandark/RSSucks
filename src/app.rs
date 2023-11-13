@@ -56,20 +56,15 @@ impl eframe::App for RSSucks {
 impl RSSucks {
     fn draw_side_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left_panel").show(ctx, |ui| {
-            ui.heading("Rust Sucks");
+            egui::widgets::global_dark_light_mode_buttons(ui);
+            ui.heading("Rust SuckS");
             ui.label("用 Rust 写的 RSS 阅读器");
-            ui.label("虽然还不能用但是给我个 Star 好不好就当投资了嘛");
             ui.hyperlink_to("RSSucks on Github", "https://github.com/jyi2ya/RSSucks");
 
             ui.separator();
 
-            let _ = ui.button("今日订阅");
-            let _ = ui.button("等下再看");
-            let _ = ui.button("我的收藏");
-
-            ui.separator();
-
             ui.label("订阅列表");
+
             ui.separator();
         });
     }

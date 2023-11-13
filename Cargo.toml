@@ -24,6 +24,10 @@ ego-tree = "0.6.2"
 egui_extras = { version = "0.23.0", features = ["all_loaders"] }
 image = { version = "0.24.7", features = ["jpeg", "png", "bmp", "gif", "webp"] }
 opml = "1.1.5"
+uuid = { version = "1.5.0", features = ["v4"] }
+feed-rs = "1.3.0"
+url = "2.4.1"
+ehttp = "0.3.1"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
