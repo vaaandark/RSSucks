@@ -18,8 +18,12 @@ log = "0.4"
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 reqwest = "0.11.22"
-opml = "1.1.5"
 anyhow = "1.0.75"
+scraper = "0.18.1"
+ego-tree = "0.6.2"
+egui_extras = { version = "0.23.0", features = ["all_loaders"] }
+image = { version = "0.24.7", features = ["jpeg", "png", "bmp", "gif", "webp"] }
+opml = "1.1.5"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -28,7 +32,7 @@ env_logger = "0.10"
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
-
+getrandom = { version = "0.2.11", features = ["js"] }
 
 [profile.release]
 strip = true
