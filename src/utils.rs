@@ -58,8 +58,6 @@ pub mod rss_client {
     struct Folder {
         pub id: FolderId,
         pub name: String,
-
-        feeds: HashSet<FeedId>,
     }
 
     impl Folder {
@@ -68,13 +66,13 @@ pub mod rss_client {
             Self {
                 id,
                 name: name.to_string(),
-                feeds: HashSet::new(),
             }
         }
     }
 
     struct Feed {
         pub id: FeedId,
+        pub folder_id: Option<FolderId>,
         pub url: url::Url,
         pub model: Arc<Mutex<Option<feed_rs::model::Feed>>>,
     }
@@ -84,9 +82,20 @@ pub mod rss_client {
             let id = FeedId::new();
             Self {
                 id,
+                folder_id: None,
                 url,
                 model: Arc::new(Mutex::new(None)),
             }
+        }
+
+        pub fn move_no_folder(&mut self) -> &mut Self {
+            self.folder_id = None;
+            self
+        }
+
+        pub fn move_to_folder(&mut self, folder_id: FolderId) -> &mut Self {
+            self.folder_id = Some(folder_id);
+            self
         }
     }
 
@@ -119,6 +128,10 @@ pub mod rss_client {
             self.folders.remove(&id)
         }
 
+        pub fn list_folder(&self) -> impl Iterator + '_ {
+            self.folders.iter()
+        }
+
         pub fn create_feed(&mut self, url: url::Url) -> FeedId {
             let feed = Feed::new_with_url(url);
             let id = feed.id;
@@ -132,6 +145,10 @@ pub mod rss_client {
 
         pub fn delete_feed(&mut self, id: FeedId) -> Option<Feed> {
             self.feeds.remove(&id)
+        }
+
+        pub fn list_feed(&self) -> impl Iterator + '_ {
+            self.feeds.iter()
         }
 
         pub fn try_start_sync_feed(&self, id: FeedId) -> Result<()> {
