@@ -5,21 +5,20 @@ use serde::{Deserialize, Serialize};
 /// Universally Unique Identifier for [`Article`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct ArticleUuid {
-    updated: Option<DateTime<Utc>>,
     feed_id: EntryUuid,
     id: String,
 }
 
 impl ArticleUuid {
-    pub fn new(updated: Option<DateTime<Utc>>, feed_id: &EntryUuid, id: String) -> Self {
+    pub fn new(feed_id: &EntryUuid, id: String) -> Self {
         Self {
-            updated,
             feed_id: *feed_id,
             id,
         }
     }
 }
 
+/// Article, which can be convertec from [`feed_rs::model::Entry`]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Article {
     pub updated: Option<DateTime<Utc>>,
@@ -57,9 +56,14 @@ impl From<feed_rs::model::Entry> for Article {
 
 impl Article {
     #[allow(unused)]
-    fn set_belonging(mut self, id: &EntryUuid) -> Self {
+    pub fn set_belonging(mut self, id: &EntryUuid) -> Self {
         self.belong_to = Some(*id);
         self
+    }
+
+    #[allow(unused)]
+    pub fn set_read(&mut self) {
+        self.unread = false;
     }
 }
 

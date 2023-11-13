@@ -1,7 +1,7 @@
 //! Wrapper for external crate [`opml`].
 use anyhow::{Context, Ok, Result};
 use opml::OPML;
-use reqwest::Url;
+use url::Url;
 
 /// Main data structure for OPML,
 /// which can be converted from [`opml::OPML`].
