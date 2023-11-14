@@ -1,4 +1,4 @@
-use std::cell::Ref;
+use std::cell::{Ref, RefCell};
 
 use egui::Widget;
 use uuid::Uuid;
@@ -18,6 +18,7 @@ pub trait Window {
 pub struct ReaderView {
     entry_id_in_feed: String,
     feed_id: FeedId,
+    cached_detail: RefCell<Option<renderer::Detail>>,
 }
 
 impl ReaderView {
@@ -25,60 +26,69 @@ impl ReaderView {
         Self {
             entry_id_in_feed,
             feed_id,
+            cached_detail: RefCell::new(None),
         }
     }
 }
 
 impl View for ReaderView {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
-        let feed = app.rss_client.get_feed(&self.feed_id).unwrap();
-        let entry = feed
-            .model
-            .as_ref()
-            .unwrap()
-            .entries
-            .iter()
-            .find(|entry| entry.id == self.entry_id_in_feed)
-            .unwrap();
-        let content = entry
-            .summary
-            .iter()
-            .next()
-            .map(|content| content.content.clone())
-            .unwrap_or("no content".to_owned());
-        let time = entry
-            .updated
-            .iter()
-            .next()
-            .map(|dt| dt.to_string())
-            .unwrap_or("no time".to_owned());
-        let link = entry
-            .links
-            .iter()
-            .next()
-            .map(|link| link.href.as_str())
-            .unwrap_or("no link");
-        let title = entry
-            .title
-            .as_ref()
-            .map(|title| title.content.clone())
-            .unwrap_or("unnamed".to_owned());
-        let author = entry
-            .authors
-            .iter()
-            .next()
-            .map(|author| author.name.as_str());
-        let channel = feed.url.as_str();
-        let component = renderer::ArticleComponent::new(
-            channel,
-            author,
-            title.as_str(),
-            link,
-            time.as_str(),
-            content.as_str(),
-        );
-        let ctx = ui.ctx().clone();
-        component.render_detail_component(&ctx, ui).unwrap();
+        if self.cached_detail.borrow().is_none() {
+            let feed = app.rss_client.get_feed(&self.feed_id).unwrap();
+            let entry = feed
+                .model
+                .as_ref()
+                .unwrap()
+                .entries
+                .iter()
+                .find(|entry| entry.id == self.entry_id_in_feed)
+                .unwrap();
+            let summary = entry
+                .summary
+                .iter()
+                .next()
+                .map(|content| content.content.clone())
+                .unwrap_or("no content".to_owned());
+            let content = entry
+                .content
+                .iter()
+                .next()
+                .map(|content| content.body.as_ref().unwrap_or(&summary).clone())
+                .unwrap_or(summary.to_owned());
+            let time = entry
+                .updated
+                .iter()
+                .next()
+                .map(|dt| dt.to_string())
+                .unwrap_or("no time".to_owned());
+            let link = entry
+                .links
+                .iter()
+                .next()
+                .map(|link| link.href.as_str())
+                .unwrap_or("no link");
+            let title = entry
+                .title
+                .as_ref()
+                .map(|title| title.content.clone())
+                .unwrap_or("unnamed".to_owned());
+            let author = entry
+                .authors
+                .iter()
+                .next()
+                .map(|author| author.name.as_str());
+            let channel = feed.url.as_str();
+            let component = renderer::ArticleComponent::new(
+                channel,
+                author,
+                title.as_str(),
+                link,
+                time.as_str(),
+                content.as_str(),
+            );
+            self.cached_detail.replace(Some(component.to_detail()));
+        }
+        self.cached_detail.borrow().as_ref().unwrap().ui(ui);
     }
 }
 
@@ -86,6 +96,7 @@ pub struct FeedFlowView {
     id: FeedId,
     page: usize,
     per_page: usize,
+    cached_previews: RefCell<Option<Vec<renderer::Preview>>>,
 }
 
 impl<'a> FeedFlowView {
@@ -94,6 +105,7 @@ impl<'a> FeedFlowView {
             id,
             page: 1,
             per_page: 5,
+            cached_previews: RefCell::new(None),
         }
     }
 }
@@ -119,54 +131,62 @@ impl View for FeedFlowView {
                 };
                 ui.separator();
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for entry in model
+                if self.cached_previews.borrow().is_none() {
+                    let previews = model
                         .entries
                         .iter()
-                        .skip((self.page - 1) * self.per_page)
-                        .take(self.per_page)
-                    {
-                        let content = entry
-                            .summary
-                            .iter()
-                            .next()
-                            .map(|content| content.content.clone())
-                            .unwrap_or("no content".to_owned());
-                        let time = entry
-                            .updated
-                            .iter()
-                            .next()
-                            .map(|dt| dt.to_string())
-                            .unwrap_or("no time".to_owned());
-                        let link = entry
-                            .links
-                            .iter()
-                            .next()
-                            .map(|link| link.href.as_str())
-                            .unwrap_or("no link");
-                        let title = entry
-                            .title
-                            .as_ref()
-                            .map(|title| title.content.clone())
-                            .unwrap_or("unnamed".to_owned());
-                        let author = entry
-                            .authors
-                            .iter()
-                            .next()
-                            .map(|author| author.name.as_str());
-                        let channel = feed.url.as_str();
-                        let component = renderer::ArticleComponent::new(
-                            channel,
-                            author,
-                            title.as_str(),
-                            link,
-                            time.as_str(),
-                            content.as_str(),
-                        );
-                        let ctx = ui.ctx().clone();
-                        component.render_preview_component(&ctx, ui).unwrap();
+                        .map(|entry| {
+                            let content = entry
+                                .summary
+                                .iter()
+                                .next()
+                                .map(|content| content.content.clone())
+                                .unwrap_or("no content".to_owned());
+                            let time = entry
+                                .updated
+                                .iter()
+                                .next()
+                                .map(|dt| dt.to_string())
+                                .unwrap_or("no time".to_owned());
+                            let link = entry
+                                .links
+                                .iter()
+                                .next()
+                                .map(|link| link.href.as_str())
+                                .unwrap_or("no link");
+                            let title = entry
+                                .title
+                                .as_ref()
+                                .map(|title| title.content.clone())
+                                .unwrap_or("unnamed".to_owned());
+                            let author = entry
+                                .authors
+                                .iter()
+                                .next()
+                                .map(|author| author.name.as_str());
+                            let channel = feed.url.as_str();
+                            let component = renderer::ArticleComponent::new(
+                                channel,
+                                author,
+                                title.as_str(),
+                                link,
+                                time.as_str(),
+                                content.as_str(),
+                            );
+                            component.to_preview(self.id, entry.id.to_owned())
+                        })
+                        .collect();
+                    self.cached_previews.replace(Some(previews));
+                }
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for preview in self.cached_previews.borrow().as_ref().unwrap() {
+                        ui.add(preview);
                         if ui.button("阅读全文").clicked() {
-                            app.set_view(ReaderView::new(entry.id.clone(), self.id));
+                            app.set_view(ReaderView::new(
+                                preview.entry_id.to_owned(),
+                                preview.feed_id,
+                            ));
                         }
                     }
                 });
@@ -363,27 +383,6 @@ impl<'app> LeftSidePanel<'app> {
 
 pub trait View {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui);
-}
-
-pub struct CentralPanel<'app> {
-    app: &'app RSSucks,
-}
-
-impl<'app> CentralPanel<'app> {
-    pub fn new(app: &'app RSSucks) -> Self {
-        Self { app }
-    }
-}
-
-impl<'app> CentralPanel<'app> {
-    pub fn show(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| match &self.app.view {
-            Some(view) => {
-                view.show(self.app, ui);
-            }
-            None => {}
-        });
-    }
 }
 
 #[derive(Default)]
