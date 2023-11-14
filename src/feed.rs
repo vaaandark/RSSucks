@@ -499,7 +499,7 @@ impl Feed {
             )
             .expect("Failed to parse feed.");
             feed.entries.iter().for_each(|item| {
-                let article_id = ArticleUuid::new(&entry_uuid, item.id.to_owned());
+                let article_id = ArticleUuid::new(item.updated, &entry_uuid, item.id.to_owned());
                 let mut article_id_set = article_id_set
                     .lock()
                     .expect("Failed to get the lock on article id set.");
