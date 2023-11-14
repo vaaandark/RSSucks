@@ -75,8 +75,14 @@ impl eframe::App for RSSucks {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui_extras::install_image_loaders(ctx);
+
         view::LeftSidePanel::new(&self).show(ctx);
-        view::CentralPanel::new(&self).show(ctx);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            if let Some(view) = self.view.as_ref() {
+                view.show(self, ui);
+            }
+        });
 
         for window in self.windows.lock().unwrap().iter_mut() {
             window.show(ctx);
