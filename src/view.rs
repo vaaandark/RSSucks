@@ -15,6 +15,73 @@ pub trait Window {
     fn is_open(&self) -> bool;
 }
 
+pub struct ReaderView {
+    entry_id_in_feed: String,
+    feed_id: FeedId,
+}
+
+impl ReaderView {
+    pub fn new(entry_id_in_feed: String, feed_id: FeedId) -> Self {
+        Self {
+            entry_id_in_feed,
+            feed_id,
+        }
+    }
+}
+
+impl View for ReaderView {
+    fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
+        let feed = app.rss_client.get_feed(&self.feed_id).unwrap();
+        let entry = feed
+            .model
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .find(|entry| entry.id == self.entry_id_in_feed)
+            .unwrap();
+        let content = entry
+            .summary
+            .iter()
+            .next()
+            .map(|content| content.content.clone())
+            .unwrap_or("no content".to_owned());
+        let time = entry
+            .updated
+            .iter()
+            .next()
+            .map(|dt| dt.to_string())
+            .unwrap_or("no time".to_owned());
+        let link = entry
+            .links
+            .iter()
+            .next()
+            .map(|link| link.href.as_str())
+            .unwrap_or("no link");
+        let title = entry
+            .title
+            .as_ref()
+            .map(|title| title.content.clone())
+            .unwrap_or("unnamed".to_owned());
+        let author = entry
+            .authors
+            .iter()
+            .next()
+            .map(|author| author.name.as_str());
+        let channel = feed.url.as_str();
+        let component = renderer::ArticleComponent::new(
+            channel,
+            author,
+            title.as_str(),
+            link,
+            time.as_str(),
+            content.as_str(),
+        );
+        let ctx = ui.ctx().clone();
+        component.render_detail_component(&ctx, ui).unwrap();
+    }
+}
+
 pub struct FeedFlowView {
     id: FeedId,
     page: usize,
@@ -98,6 +165,9 @@ impl View for FeedFlowView {
                         );
                         let ctx = ui.ctx().clone();
                         component.render_preview_component(&ctx, ui).unwrap();
+                        if ui.button("阅读全文").clicked() {
+                            app.set_view(ReaderView::new(entry.id.clone(), self.id));
+                        }
                     }
                 });
 
