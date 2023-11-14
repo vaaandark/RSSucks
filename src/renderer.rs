@@ -1,4 +1,4 @@
-use anyhow::Result;
+// use anyhow::Result;
 use ego_tree::iter::Edge;
 use egui::{Image, Margin, RichText, Rounding, Separator, Widget};
 use scraper::Html;
@@ -94,6 +94,7 @@ pub struct Preview {
     overflow_character: Option<char>,
     fulltext: String,
     title: String,
+    max_images_num: usize,
 
     pub feed_id: FeedId,
     pub entry_id: String,
@@ -135,29 +136,45 @@ impl Widget for &Preview {
                     };
                     ui.label(job);
                     // Then render images.
-                    egui::ScrollArea::horizontal()
-                        .id_source(self.scroll_area_id)
-                        .auto_shrink([false; 2])
-                        .drag_to_scroll(true)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                self.widgets.iter().for_each(|widget| {
-                                    if let WidgetType::Image {
-                                        src: Some(src),
-                                        width: _,
-                                        height: _,
-                                    } = widget
-                                    {
+                    let mut images_iter = self
+                        .widgets
+                        .iter()
+                        .filter_map(|widget| {
+                            if let WidgetType::Image {
+                                src: Some(src),
+                                width: _,
+                                height: _,
+                            } = widget
+                            {
+                                Some(src)
+                            } else {
+                                None
+                            }
+                        })
+                        .take(self.max_images_num)
+                        .peekable();
+                    if images_iter.peek().is_some() {
+                        egui::ScrollArea::horizontal()
+                            .id_source(self.scroll_area_id)
+                            .auto_shrink([false, true])
+                            .drag_to_scroll(true)
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    images_iter.for_each(|src| {
                                         ui.add(
                                             Image::from(src)
                                                 .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
                                                 .rounding(Rounding::ZERO.at_least(10.0))
                                                 .show_loading_spinner(true),
                                         );
-                                    }
+                                    });
                                 });
                             });
-                        });
+                    }
+                    ui.allocate_space(egui::Vec2 {
+                        x: ui.max_rect().width(),
+                        y: 0.0,
+                    });
                 });
         })
         .response
@@ -166,7 +183,7 @@ impl Widget for &Preview {
 
 pub struct Detail {
     widgets: Vec<WidgetType>,
-    scroll_area_id: Uuid,
+    // scroll_area_id: Uuid,
     title: String,
     link: String,
     author: Option<String>,
@@ -437,7 +454,7 @@ impl<'a> ArticleComponent<'_> {
     pub fn to_detail(&self) -> Detail {
         Detail {
             widgets: self.widgets.iter().cloned().collect(),
-            scroll_area_id: Uuid::new_v4(),
+            // scroll_area_id: Uuid::new_v4(),
             title: self.title.to_owned(),
             link: self.link.to_owned(),
             author: self.author.map(|author| author.to_owned()),
@@ -457,6 +474,7 @@ impl<'a> ArticleComponent<'_> {
             title: self.title.to_owned(),
             feed_id,
             entry_id,
+            max_images_num: 3,
         }
     }
 }
