@@ -262,90 +262,92 @@ impl<'a> ArticleComponent<'_> {
                     egui::Frame::none()
                         .outer_margin(Margin::symmetric(16.0, 4.0))
                         .show(ui, |ui| {
-                            ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
-                            let widgets_num = self.widgets.len();
-                            let mut idx: usize = 0;
-                            while idx < widgets_num {
-                                ui.horizontal_wrapped(|ui| loop {
-                                    match self.try_get_widget_by_index(idx) {
-                                        Some(WidgetType::Label { text: _ }) => {
-                                            if let Some(WidgetType::Label { text: label }) =
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                ui.spacing_mut().item_spacing = egui::vec2(0.0, 4.0);
+                                let widgets_num = self.widgets.len();
+                                let mut idx: usize = 0;
+                                while idx < widgets_num {
+                                    ui.horizontal_wrapped(|ui| loop {
+                                        match self.try_get_widget_by_index(idx) {
+                                            Some(WidgetType::Label { text: _ }) => {
+                                                if let Some(WidgetType::Label { text: label }) =
+                                                    self.try_get_widget_by_index(idx)
+                                                {
+                                                    ui.label(label.clone());
+                                                    idx += 1;
+                                                }
+                                            }
+                                            Some(WidgetType::Newline) => {
+                                                ui.end_row();
+                                                idx += 1;
+                                            }
+                                            Some(WidgetType::Hyperlink {
+                                                text: _,
+                                                destination: _,
+                                            }) => {
+                                                if let Some(WidgetType::Hyperlink {
+                                                    text: label,
+                                                    destination: dest,
+                                                }) = self.try_get_widget_by_index(idx)
+                                                {
+                                                    ui.hyperlink_to(label.clone(), dest);
+                                                    idx += 1;
+                                                }
+                                            }
+                                            Some(WidgetType::Separator) => {
+                                                ui.add(Separator::horizontal(Separator::default()));
+                                                idx += 1;
+                                            }
+                                            _ => break,
+                                        }
+                                    });
+                                    ui.horizontal_wrapped(|ui| {
+                                        while let Some(WidgetType::Image {
+                                            src: _,
+                                            width: _,
+                                            height: _,
+                                        }) = self.try_get_widget_by_index(idx)
+                                        {
+                                            if let Some(WidgetType::Image { src, width, height }) =
                                                 self.try_get_widget_by_index(idx)
                                             {
-                                                ui.label(label.clone());
+                                                if let Some(src) = src {
+                                                    egui_extras::install_image_loaders(ctx);
+                                                    ui.add(
+                                                        Image::from(src)
+                                                            .fit_to_original_size(1.0)
+                                                            .max_width(match width {
+                                                                Some(width) => {
+                                                                    match width.parse::<f32>() {
+                                                                        Ok(width) => f32::min(
+                                                                            width,
+                                                                            ui.max_rect().width(),
+                                                                        ),
+                                                                        _ => ui.max_rect().width(),
+                                                                    }
+                                                                }
+                                                                None => ui.max_rect().width(),
+                                                            })
+                                                            .max_height(match height {
+                                                                Some(height) => {
+                                                                    match height.parse::<f32>() {
+                                                                        Ok(height) => height,
+                                                                        _ => f32::INFINITY,
+                                                                    }
+                                                                }
+                                                                None => f32::INFINITY,
+                                                            })
+                                                            .rounding(Rounding::ZERO.at_least(10.0))
+                                                            .show_loading_spinner(true),
+                                                    );
+                                                }
                                                 idx += 1;
                                             }
                                         }
-                                        Some(WidgetType::Newline) => {
-                                            ui.end_row();
-                                            idx += 1;
-                                        }
-                                        Some(WidgetType::Hyperlink {
-                                            text: _,
-                                            destination: _,
-                                        }) => {
-                                            if let Some(WidgetType::Hyperlink {
-                                                text: label,
-                                                destination: dest,
-                                            }) = self.try_get_widget_by_index(idx)
-                                            {
-                                                ui.hyperlink_to(label.clone(), dest);
-                                                idx += 1;
-                                            }
-                                        }
-                                        Some(WidgetType::Separator) => {
-                                            ui.add(Separator::horizontal(Separator::default()));
-                                            idx += 1;
-                                        }
-                                        _ => break,
-                                    }
-                                });
-                                ui.horizontal_wrapped(|ui| {
-                                    while let Some(WidgetType::Image {
-                                        src: _,
-                                        width: _,
-                                        height: _,
-                                    }) = self.try_get_widget_by_index(idx)
-                                    {
-                                        if let Some(WidgetType::Image { src, width, height }) =
-                                            self.try_get_widget_by_index(idx)
-                                        {
-                                            if let Some(src) = src {
-                                                egui_extras::install_image_loaders(ctx);
-                                                ui.add(
-                                                    Image::from(src)
-                                                        .fit_to_original_size(1.0)
-                                                        .max_width(match width {
-                                                            Some(width) => {
-                                                                match width.parse::<f32>() {
-                                                                    Ok(width) => f32::min(
-                                                                        width,
-                                                                        ui.max_rect().width(),
-                                                                    ),
-                                                                    _ => ui.max_rect().width(),
-                                                                }
-                                                            }
-                                                            None => ui.max_rect().width(),
-                                                        })
-                                                        .max_height(match height {
-                                                            Some(height) => {
-                                                                match height.parse::<f32>() {
-                                                                    Ok(height) => height,
-                                                                    _ => f32::INFINITY,
-                                                                }
-                                                            }
-                                                            None => f32::INFINITY,
-                                                        })
-                                                        .rounding(Rounding::ZERO.at_least(10.0))
-                                                        .show_loading_spinner(true),
-                                                );
-                                            }
-                                            idx += 1;
-                                        }
-                                    }
-                                    ui.end_row();
-                                });
-                            }
+                                        ui.end_row();
+                                    });
+                                }
+                            });
                         });
                 });
             });
