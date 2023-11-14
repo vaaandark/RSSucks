@@ -3,6 +3,7 @@ use ego_tree::iter::Edge;
 use egui::{Image, Margin, RichText, Rounding, Separator};
 use scraper::Html;
 use std::collections::VecDeque;
+use uuid::Uuid;
 
 enum WidgetType {
     Label {
@@ -385,29 +386,34 @@ impl<'a> ArticleComponent<'_> {
                 };
                 ui.label(job);
                 // Then render images.
-                egui::ScrollArea::horizontal()
-                    .auto_shrink([false; 2])
-                    .drag_to_scroll(true)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            self.widgets.iter().for_each(|widget| {
-                                if let WidgetType::Image {
-                                    src: Some(src),
-                                    width: _,
-                                    height: _,
-                                } = widget
-                                {
-                                    egui_extras::install_image_loaders(ctx);
-                                    ui.add(
-                                        Image::from(src)
-                                            .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
-                                            .rounding(Rounding::ZERO.at_least(10.0))
-                                            .show_loading_spinner(true),
-                                    );
-                                }
-                            });
+                // egui::ScrollArea::horizontal()
+                //     .id_source(Uuid::new_v4())
+                //     .auto_shrink([false; 2])
+                //     .drag_to_scroll(true)
+                //     .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    self.widgets
+                        .iter()
+                        .filter_map(|widget| match widget {
+                            WidgetType::Image {
+                                src,
+                                width: _,
+                                height: _,
+                            } => src.as_ref(),
+                            _ => None,
+                        })
+                        .take(3)
+                        .for_each(|src| {
+                            egui_extras::install_image_loaders(ctx);
+                            ui.add(
+                                Image::from(src)
+                                    .fit_to_exact_size(egui::Vec2::new(256.0, 128.0))
+                                    .rounding(Rounding::ZERO.at_least(10.0))
+                                    .show_loading_spinner(true),
+                            );
                         });
-                    });
+                });
+                // });
             });
         Ok(())
     }

@@ -17,20 +17,27 @@ pub trait Window {
 
 pub struct FeedFlowView {
     id: FeedId,
+    page: usize,
+    per_page: usize,
 }
 
 impl<'a> FeedFlowView {
     pub fn new(id: FeedId) -> Self {
-        Self { id }
+        Self {
+            id,
+            page: 1,
+            per_page: 5,
+        }
     }
 }
 
 impl View for FeedFlowView {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
-        let feed = app.rss_client.get_feed(&self.id).unwrap();
-        if feed.is_syncing {
+        if app.rss_client.feed_is_syncing(self.id) {
             ui.spinner();
         }
+
+        let feed = app.rss_client.get_feed(&self.id).unwrap();
 
         match feed.model {
             Some(model) => {
@@ -44,46 +51,57 @@ impl View for FeedFlowView {
                     ui.heading(&description.content);
                 };
                 ui.separator();
-                for entry in model.entries {
-                    let content = entry
-                        .summary
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for entry in model
+                        .entries
                         .iter()
-                        .next()
-                        .map(|content| content.content.clone())
-                        .unwrap_or("no content".to_owned());
-                    let time = entry
-                        .updated
-                        .iter()
-                        .next()
-                        .map(|dt| dt.to_string())
-                        .unwrap_or("no time".to_owned());
-                    let link = entry
-                        .links
-                        .iter()
-                        .next()
-                        .map(|link| link.href.as_str())
-                        .unwrap_or("no link");
-                    let title = entry
-                        .title
-                        .map(|title| title.content)
-                        .unwrap_or("unnamed".to_owned());
-                    let author = entry
-                        .authors
-                        .iter()
-                        .next()
-                        .map(|author| author.name.as_str());
-                    let channel = feed.url.as_str();
-                    let component = renderer::ArticleComponent::new(
-                        channel,
-                        author,
-                        title.as_str(),
-                        link,
-                        time.as_str(),
-                        content.as_str(),
-                    );
-                    let ctx = ui.ctx().clone();
-                    component.render_preview_component(&ctx, ui).unwrap();
-                }
+                        .skip((self.page - 1) * self.per_page)
+                        .take(self.per_page)
+                    {
+                        let content = entry
+                            .summary
+                            .iter()
+                            .next()
+                            .map(|content| content.content.clone())
+                            .unwrap_or("no content".to_owned());
+                        let time = entry
+                            .updated
+                            .iter()
+                            .next()
+                            .map(|dt| dt.to_string())
+                            .unwrap_or("no time".to_owned());
+                        let link = entry
+                            .links
+                            .iter()
+                            .next()
+                            .map(|link| link.href.as_str())
+                            .unwrap_or("no link");
+                        let title = entry
+                            .title
+                            .as_ref()
+                            .map(|title| title.content.clone())
+                            .unwrap_or("unnamed".to_owned());
+                        let author = entry
+                            .authors
+                            .iter()
+                            .next()
+                            .map(|author| author.name.as_str());
+                        let channel = feed.url.as_str();
+                        let component = renderer::ArticleComponent::new(
+                            channel,
+                            author,
+                            title.as_str(),
+                            link,
+                            time.as_str(),
+                            content.as_str(),
+                        );
+                        let ctx = ui.ctx().clone();
+                        component.render_preview_component(&ctx, ui).unwrap();
+                    }
+                });
+
+                ui.label("第一页（暂时还没写翻页的操作");
             }
             None => {
                 ui.label("该订阅尚未同步，现在同步吗？");
