@@ -79,6 +79,8 @@ pub struct Entry {
     belong_to: Option<FolderUuid>,
     /// UUID of this feed.
     uuid: EntryUuid,
+    /// Is synchronizing now?
+    is_synchronizing: Arc<Mutex<bool>>,
 }
 
 impl Entry {
@@ -93,6 +95,7 @@ impl Entry {
             articles: Arc::new(Mutex::new(BTreeSet::new())),
             belong_to: None,
             uuid: Uuid::new_v4().into(),
+            is_synchronizing: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -140,6 +143,7 @@ impl TryFrom<opml::Entry> for Entry {
             title: value.title,
             html_url: value.html_url,
             belong_to: None,
+            is_synchronizing: Arc::new(Mutex::new(false)),
         })
     }
 }
@@ -484,15 +488,35 @@ impl Feed {
             .collect()
     }
 
+    /// Is this entry synchronizing now?
+    /// If there is not such entry, returns `None`.
+    #[allow(unused)]
+    pub fn is_entry_synchronizing(&self, id: &EntryUuid) -> Option<bool> {
+        self.try_get_entry_by_id(id)
+            .ok()
+            .map(|entry| *entry.borrow().is_synchronizing.lock().unwrap())
+    }
+
     /// Attempts to sync articles of a entry by giveing its ID.
-    pub fn try_sync_entry_by_id(&mut self, id: &EntryUuid) -> Result<()> {
+    /// If makes it to sync, return `Ok(true)`,
+    /// else if it's synchronizing now, it returns `Ok(false)`.
+    pub fn try_sync_entry_by_id(&mut self, id: &EntryUuid) -> Result<bool> {
         let binding = self.try_get_entry_by_id(id)?;
         let entry = binding.try_borrow()?;
+        let sync_lock = entry.is_synchronizing.clone();
+        {
+            let mut is_synchronizing = sync_lock.lock().unwrap();
+            if *is_synchronizing {
+                return Ok(false);
+            }
+            *is_synchronizing = true;
+        }
         let article_id_set = entry.articles.clone();
         let article_map = self.articles_map.to_owned();
         let url = entry.xml_url.to_string();
         let entry_uuid = entry.uuid;
         ehttp::fetch(ehttp::Request::get(url.as_str()), move |result| {
+            *sync_lock.lock().unwrap() = false;
             let feed = feed_rs::parser::parse_with_uri(
                 std::io::Cursor::new(result.expect("Failed to get response.").bytes),
                 Some(url.as_str()),
@@ -517,7 +541,7 @@ impl Feed {
                 }
             });
         });
-        Ok(())
+        Ok(true)
     }
 
     /// Attempts to sync articles of all entries.
