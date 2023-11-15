@@ -1,16 +1,42 @@
+mod detail;
+mod preview;
+
 use crate::article::Article;
 use crate::feed::Feed;
 use ego_tree::iter::Edge;
+use egui::RichText;
 use lazy_static::lazy_static;
 use regex::Regex;
 use scraper;
+
+pub use self::detail::Detail;
+pub use self::preview::Preview;
 
 lazy_static! {
     static ref CONTINUOUS_WHITESPACE_PATTERN: Regex = Regex::new(r"\s+").unwrap();
 }
 
+#[derive(Clone, PartialEq)]
+enum ElementType {
+    Paragraph,
+    Heading,
+    ListItem,
+    Image,
+    Separator,
+    CodeBlock,
+    LineBreak,
+    Others,
+}
+
+impl Default for ElementType {
+    fn default() -> Self {
+        ElementType::Others
+    }
+}
+
 #[derive(Default, Clone)]
 struct Element {
+    typ: ElementType,
     // boolean variables for text style
     bold: bool,
     code: bool,
@@ -18,24 +44,29 @@ struct Element {
     emphasized: bool,
     small: bool,
     strong: bool,
-    hyperlink: bool,
     ol: bool,
     ul: bool,
-    li: bool,
-    // these variables are not for text style
-    // they represents the existence of the components
-    separator: bool,
     newline: bool,
-    // data variables for other widgets
-    text: Option<String>,
+    // data variables for widgets
+    text: Option<RichText>,
     // destination url of hyperlinks
     destination: Option<String>,
     // triple tuple of images
     // (src, width, height)
     image_tuple: (Option<String>, Option<f32>, Option<f32>),
     // level of headings
-    heading: Option<u8>,
+    heading_level: Option<u8>,
 }
+// style table:
+// tag  fontsize    margin      others
+// p    16.0        19.2, 0
+// h1   32.0        10.72, 0
+// h2   24.0        24.0, 0
+// h3   18.72       18.72, 0
+// h4   16.0        19.2, 0
+// h5   13.28       24.0, 0
+// h6   10.72       26.72, 0
+// li   padding-left: 16.0
 
 impl Element {
     fn new() -> Self {
@@ -43,11 +74,31 @@ impl Element {
     }
 }
 
+fn stylize_text(element: &Element, text: String) -> RichText {
+    let mut richtext = RichText::new(text).size(16.0);
+    if element.bold || element.strong {
+        richtext = richtext.strong();
+    }
+    if element.emphasized {
+        richtext = richtext.italics();
+    }
+    if element.deleted {
+        richtext = richtext.strikethrough();
+    }
+    if element.small {
+        richtext = richtext.small()
+    }
+    if element.code {
+        richtext = richtext.code()
+    }
+    richtext
+}
+
 // A builder helps you to get article details and previews.
 pub struct Builder<'a> {
     entry_title: Option<&'a str>,
     title: &'a str,
-    links: &'a Vec<String>,
+    link: Option<&'a str>,
     updated: Option<&'a str>,
     published: Option<&'a str>,
     elements: Option<Vec<Element>>,
@@ -63,7 +114,7 @@ impl<'a> Builder<'a> {
         let updated = article.updated.map(|s| s.as_str());
         let published = article.published.map(|s| s.as_str());
         let title = &article.title;
-        let links = &article.links;
+        let link = article.links.get(0).map(|link| link.as_str());
         let summary = article.summary.as_ref();
         let catrgories = article.categories;
         let entry_title = article.belong_to.and_then(|entry_uuid| {
@@ -76,9 +127,9 @@ impl<'a> Builder<'a> {
         let (elements, fulltext) = if let Some(summary) = summary {
             let fragment = scraper::Html::parse_fragment(summary);
             let mut dom_stack: Vec<String> = Vec::new();
-            let mut elements: Vec<_> = Vec::new();
+            let mut elements = Vec::new();
             let mut fulltext = String::new();
-            let mut element_stack: Vec<_> = vec![Element::new()];
+            let mut element_stack = vec![Element::new()];
 
             for edge in fragment.root_element().traverse() {
                 match edge {
@@ -88,6 +139,7 @@ impl<'a> Builder<'a> {
                                 // in case that it is not a meaningless new empty line in html document
                                 continue;
                             }
+                            let mut element = element_stack.last().unwrap().clone();
                             let text = if !dom_stack.iter().any(|tag| tag == "pre") {
                                 // the text is not preformatted
                                 // delete continuous whitespace, \n and \r
@@ -97,16 +149,20 @@ impl<'a> Builder<'a> {
                                     .to_owned()
                             } else {
                                 // or else, remain the raw text entirely
+                                if dom_stack.iter().any(|tag| tag == "code") {
+                                    // in case of code blocks
+                                    element.typ = ElementType::CodeBlock;
+                                }
                                 text.to_string()
                             };
                             fulltext += &text;
-                            // TODO: remove unwrap
-                            elements.push(element_stack.last().unwrap().clone())
+                            element.text = Some(stylize_text(&element, text));
                         }
                         scraper::Node::Element(tag) => {
                             dom_stack.push(tag.name().to_owned());
                             let mut element = element_stack.last().unwrap().clone();
                             match tag.name() {
+                                "p" => element.typ = ElementType::Paragraph,
                                 "b" => element.bold = true,
                                 "code" => element.code = true,
                                 "del" => element.deleted = true,
@@ -114,25 +170,35 @@ impl<'a> Builder<'a> {
                                 "small" => element.small = true,
                                 "strong" => element.strong = true,
                                 "a" => {
-                                    element.hyperlink = true;
                                     element.destination =
                                         tag.attr("href").map(|dest| dest.to_owned());
                                 }
                                 "ol" => element.ol = true,
                                 "ul" => element.ul = true,
-                                "li" => element.li = true,
-                                "hr" => element.separator = true,
-                                "br" => element.newline = true,
+                                "li" => element.typ = ElementType::ListItem,
+                                "hr" => element.typ = ElementType::Separator,
+                                "br" => elements.push(Element {
+                                    typ: ElementType::LineBreak,
+                                    ..Default::default()
+                                }),
                                 "img" => {
+                                    element.typ = ElementType::Image;
                                     element.image_tuple = (
                                         tag.attr("src").map(|s| s.to_owned()),
                                         tag.attr("width").and_then(|s| s.parse::<f32>().ok()),
                                         tag.attr("height").and_then(|s| s.parse::<f32>().ok()),
-                                    )
+                                    );
+                                    elements.push(element)
                                 }
                                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-                                    element.heading = tag.name()[1..].parse().ok()
+                                    element.typ = ElementType::Heading;
+                                    element.heading_level = tag.name()[1..].parse().ok();
                                 }
+                            }
+                            // block display tags
+                            match tag.name() {
+                                "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "ul" | "p"
+                                | "hr" | "pre" => element.newline = true,
                             }
                             element_stack.push(element);
                         }
@@ -142,14 +208,6 @@ impl<'a> Builder<'a> {
                     Edge::Close(node) => {
                         if let scraper::Node::Element(tag) = node.value() {
                             element_stack.pop();
-                            match tag.name() {
-                                // block display tags
-                                "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "ul" | "p"
-                                | "hr" | "pre" => elements.push(Element {
-                                    newline: true,
-                                    ..Element::default()
-                                }),
-                            }
                         }
                     }
                 }
@@ -161,7 +219,7 @@ impl<'a> Builder<'a> {
         Builder {
             entry_title,
             title,
-            links,
+            link,
             updated,
             published,
             elements,
@@ -170,5 +228,9 @@ impl<'a> Builder<'a> {
             overflow_character: Some('…'),
             fulltext,
         }
+    }
+
+    fn to_preview(&self) -> Preview<'a> {
+        Preview::from(self)
     }
 }
