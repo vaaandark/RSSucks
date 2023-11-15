@@ -516,12 +516,12 @@ impl Feed {
         let url = entry.xml_url.to_string();
         let entry_uuid = entry.uuid;
         ehttp::fetch(ehttp::Request::get(url.as_str()), move |result| {
-            *sync_lock.lock().unwrap() = false;
             let feed = feed_rs::parser::parse_with_uri(
                 std::io::Cursor::new(result.expect("Failed to get response.").bytes),
                 Some(url.as_str()),
             )
             .expect("Failed to parse feed.");
+            *sync_lock.lock().unwrap() = false;
             feed.entries.iter().for_each(|item| {
                 let article_id = ArticleUuid::new(item.updated, &entry_uuid, item.id.to_owned());
                 let mut article_id_set = article_id_set
