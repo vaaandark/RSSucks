@@ -79,20 +79,23 @@ pub struct Entry {
     belong_to: Option<FolderUuid>,
     /// UUID of this feed.
     uuid: EntryUuid,
+    /// Is synchronizing now?
+    is_synchronizing: Arc<Mutex<bool>>,
 }
 
 impl Entry {
     /// Creates an `Entry` for a feed.
     #[allow(unused)]
-    pub fn new(text: String, xml_url: Url) -> Self {
+    pub fn new(text: impl ToString, xml_url: Url) -> Self {
         Entry {
-            title: Some(text.to_owned()),
-            text,
+            title: Some(text.to_string()),
+            text: text.to_string(),
             html_url: xml_url.join("/").ok(),
             xml_url,
             articles: Arc::new(Mutex::new(BTreeSet::new())),
             belong_to: None,
             uuid: Uuid::new_v4().into(),
+            is_synchronizing: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -119,11 +122,11 @@ impl Entry {
 
     /// Set the title of the entry.
     #[allow(unused)]
-    pub fn rename(&mut self, name: String) {
+    pub fn rename(&mut self, name: impl ToString) {
         if self.title.is_some() {
-            self.title = Some(name.to_owned());
+            self.title = Some(name.to_string());
         }
-        self.text = name;
+        self.text = name.to_string();
     }
 }
 
@@ -140,6 +143,7 @@ impl TryFrom<opml::Entry> for Entry {
             title: value.title,
             html_url: value.html_url,
             belong_to: None,
+            is_synchronizing: Arc::new(Mutex::new(false)),
         })
     }
 }
@@ -161,6 +165,17 @@ pub struct Folder {
 }
 
 impl Folder {
+    /// Creates a `Folder` for a feed.
+    #[allow(unused)]
+    pub fn new(name: impl ToString) -> Self {
+        Folder {
+            text: name.to_string(),
+            title: Some(name.to_string()),
+            entries: HashSet::new(),
+            uuid: Uuid::new_v4().into(),
+        }
+    }
+
     /// Returns the title of the folder.
     #[allow(unused)]
     pub fn title(&self) -> &str {
@@ -169,11 +184,11 @@ impl Folder {
 
     /// Set the title of the folder.
     #[allow(unused)]
-    pub fn rename(&mut self, name: String) {
+    pub fn rename(&mut self, name: impl ToString) {
         if self.title.is_some() {
-            self.title = Some(name.to_owned());
+            self.title = Some(name.to_string());
         }
-        self.text = name;
+        self.text = name.to_string();
     }
 
     /// Returns the IDs of all entries in the folder.
@@ -362,6 +377,15 @@ impl Feed {
         Ok(())
     }
 
+    /// Addes an empty folder into a feed.
+    #[allow(unused)]
+    pub fn add_empty_folder(&mut self, folder: Folder) -> FolderUuid {
+        let uuid = folder.uuid;
+        let folder = Rc::new(RefCell::new(folder));
+        self.folders_map.insert(uuid, folder);
+        uuid
+    }
+
     /// Addes an orphan entry which doesn't belong to any folder.
     #[allow(unused)]
     pub fn add_orphan_entry(&mut self, entry: Entry) -> EntryUuid {
@@ -484,15 +508,35 @@ impl Feed {
             .collect()
     }
 
+    /// Is this entry synchronizing now?
+    /// If there is not such entry, returns `None`.
+    #[allow(unused)]
+    pub fn is_entry_synchronizing(&self, id: &EntryUuid) -> Option<bool> {
+        self.try_get_entry_by_id(id)
+            .ok()
+            .map(|entry| *entry.borrow().is_synchronizing.lock().unwrap())
+    }
+
     /// Attempts to sync articles of a entry by giveing its ID.
-    pub fn try_sync_entry_by_id(&mut self, id: &EntryUuid) -> Result<()> {
+    /// If makes it to sync, return `Ok(true)`,
+    /// else if it's synchronizing now, it returns `Ok(false)`.
+    pub fn try_sync_entry_by_id(&mut self, id: &EntryUuid) -> Result<bool> {
         let binding = self.try_get_entry_by_id(id)?;
         let entry = binding.try_borrow()?;
+        let sync_lock = entry.is_synchronizing.clone();
+        {
+            let mut is_synchronizing = sync_lock.lock().unwrap();
+            if *is_synchronizing {
+                return Ok(false);
+            }
+            *is_synchronizing = true;
+        }
         let article_id_set = entry.articles.clone();
         let article_map = self.articles_map.to_owned();
         let url = entry.xml_url.to_string();
         let entry_uuid = entry.uuid;
         ehttp::fetch(ehttp::Request::get(url.as_str()), move |result| {
+            *sync_lock.lock().unwrap() = false;
             let feed = feed_rs::parser::parse_with_uri(
                 std::io::Cursor::new(result.expect("Failed to get response.").bytes),
                 Some(url.as_str()),
@@ -517,7 +561,7 @@ impl Feed {
                 }
             });
         });
-        Ok(())
+        Ok(true)
     }
 
     /// Attempts to sync articles of all entries.
