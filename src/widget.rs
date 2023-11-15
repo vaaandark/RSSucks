@@ -1,7 +1,7 @@
 use egui::{Response, Ui, Widget};
 
 use crate::{
-    utils::rss_client::{FeedId, FolderId},
+    utils::rss_client_ng::{FeedId, FolderId},
     view, RSSucks,
 };
 
@@ -72,7 +72,7 @@ impl<'app> CollapsingFolder<'app> {
 impl<'app> Widget for CollapsingFolder<'app> {
     fn ui(self, ui: &mut Ui) -> Response {
         let folder = self.app.rss_client.get_folder(&self.folder_id).unwrap();
-        let response = egui::CollapsingHeader::new(&folder.name).show(ui, |ui| {
+        let response = egui::CollapsingHeader::new(folder.name()).show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("🔁").on_hover_text("拉取文章").clicked() {
                     self.app

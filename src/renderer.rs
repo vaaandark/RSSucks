@@ -5,7 +5,7 @@ use scraper::Html;
 use std::collections::VecDeque;
 use uuid::Uuid;
 
-use crate::utils::rss_client::FeedId;
+use crate::utils::rss_client_ng::FeedId;
 
 #[derive(Clone)]
 enum WidgetType {

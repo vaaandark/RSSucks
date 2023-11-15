@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     renderer,
-    utils::rss_client::{FeedId, FolderId, RssClient},
+    utils::rss_client_ng::{FeedId, FolderId, RssClient},
     widget::{self, CollapsingFolder},
     RSSucks,
 };
@@ -34,58 +34,14 @@ impl ReaderView {
 impl View for ReaderView {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
         if self.cached_detail.borrow().is_none() {
-            let feed = app.rss_client.get_feed(&self.feed_id).unwrap();
-            let entry = feed
-                .model
-                .as_ref()
-                .unwrap()
-                .entries
-                .iter()
-                .find(|entry| entry.id == self.entry_id_in_feed)
-                .unwrap();
-            let summary = entry
-                .summary
-                .iter()
-                .next()
-                .map(|content| content.content.clone())
-                .unwrap_or("no content".to_owned());
-            let content = entry
-                .content
-                .iter()
-                .next()
-                .map(|content| content.body.as_ref().unwrap_or(&summary).clone())
-                .unwrap_or(summary.to_owned());
-            let time = entry
-                .updated
-                .iter()
-                .next()
-                .map(|dt| dt.to_string())
-                .unwrap_or("no time".to_owned());
-            let link = entry
-                .links
-                .iter()
-                .next()
-                .map(|link| link.href.as_str())
-                .unwrap_or("no link");
-            let title = entry
-                .title
-                .as_ref()
-                .map(|title| title.content.clone())
-                .unwrap_or("unnamed".to_owned());
-            let author = entry
-                .authors
-                .iter()
-                .next()
-                .map(|author| author.name.as_str());
-            let channel = feed.url.as_str();
-            let component = renderer::ArticleComponent::new(
-                channel,
-                author,
-                title.as_str(),
-                link,
-                time.as_str(),
-                content.as_str(),
-            );
+            let content = "stub";
+            let time = "stub";
+            let link = "stub";
+            let title = "stub";
+            let author = "stub";
+            let channel = "stub";
+            let component =
+                renderer::ArticleComponent::new(channel, Some(author), title, link, time, content);
             self.cached_detail.replace(Some(component.to_detail()));
         }
         self.cached_detail.borrow().as_ref().unwrap().ui(ui);
@@ -118,88 +74,88 @@ impl View for FeedFlowView {
 
         let feed = app.rss_client.get_feed(&self.id).unwrap();
 
-        match feed.model {
-            Some(model) => {
-                if let Some(title) = model.title {
-                    ui.heading(&title.content);
-                };
-                if let Some(updated) = model.updated {
-                    ui.label(format!("更新于 {}", updated));
-                };
-                if let Some(description) = model.description {
-                    ui.heading(&description.content);
-                };
-                ui.separator();
+        // match feed.model {
+        //     Some(model) => {
+        //         if let Some(title) = model.title {
+        //             ui.heading(&title.content);
+        //         };
+        //         if let Some(updated) = model.updated {
+        //             ui.label(format!("更新于 {}", updated));
+        //         };
+        //         if let Some(description) = model.description {
+        //             ui.heading(&description.content);
+        //         };
+        //         ui.separator();
 
-                if self.cached_previews.borrow().is_none() {
-                    let previews = model
-                        .entries
-                        .iter()
-                        .map(|entry| {
-                            let content = entry
-                                .summary
-                                .iter()
-                                .next()
-                                .map(|content| content.content.clone())
-                                .unwrap_or("no content".to_owned());
-                            let time = entry
-                                .updated
-                                .iter()
-                                .next()
-                                .map(|dt| dt.to_string())
-                                .unwrap_or("no time".to_owned());
-                            let link = entry
-                                .links
-                                .iter()
-                                .next()
-                                .map(|link| link.href.as_str())
-                                .unwrap_or("no link");
-                            let title = entry
-                                .title
-                                .as_ref()
-                                .map(|title| title.content.clone())
-                                .unwrap_or("unnamed".to_owned());
-                            let author = entry
-                                .authors
-                                .iter()
-                                .next()
-                                .map(|author| author.name.as_str());
-                            let channel = feed.url.as_str();
-                            let component = renderer::ArticleComponent::new(
-                                channel,
-                                author,
-                                title.as_str(),
-                                link,
-                                time.as_str(),
-                                content.as_str(),
-                            );
-                            component.to_preview(self.id, entry.id.to_owned())
-                        })
-                        .collect();
-                    self.cached_previews.replace(Some(previews));
-                }
+        //         if self.cached_previews.borrow().is_none() {
+        //             let previews = model
+        //                 .entries
+        //                 .iter()
+        //                 .map(|entry| {
+        //                     let content = entry
+        //                         .summary
+        //                         .iter()
+        //                         .next()
+        //                         .map(|content| content.content.clone())
+        //                         .unwrap_or("no content".to_owned());
+        //                     let time = entry
+        //                         .updated
+        //                         .iter()
+        //                         .next()
+        //                         .map(|dt| dt.to_string())
+        //                         .unwrap_or("no time".to_owned());
+        //                     let link = entry
+        //                         .links
+        //                         .iter()
+        //                         .next()
+        //                         .map(|link| link.href.as_str())
+        //                         .unwrap_or("no link");
+        //                     let title = entry
+        //                         .title
+        //                         .as_ref()
+        //                         .map(|title| title.content.clone())
+        //                         .unwrap_or("unnamed".to_owned());
+        //                     let author = entry
+        //                         .authors
+        //                         .iter()
+        //                         .next()
+        //                         .map(|author| author.name.as_str());
+        //                     let channel = feed.url.as_str();
+        //                     let component = renderer::ArticleComponent::new(
+        //                         channel,
+        //                         author,
+        //                         title.as_str(),
+        //                         link,
+        //                         time.as_str(),
+        //                         content.as_str(),
+        //                     );
+        //                     component.to_preview(self.id, entry.id.to_owned())
+        //                 })
+        //                 .collect();
+        //             self.cached_previews.replace(Some(previews));
+        //         }
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for preview in self.cached_previews.borrow().as_ref().unwrap() {
-                        ui.add(preview);
-                        if ui.button("阅读全文").clicked() {
-                            app.set_view(ReaderView::new(
-                                preview.entry_id.to_owned(),
-                                preview.feed_id,
-                            ));
-                        }
-                    }
-                });
+        //         egui::ScrollArea::vertical().show(ui, |ui| {
+        //             for preview in self.cached_previews.borrow().as_ref().unwrap() {
+        //                 ui.add(preview);
+        //                 if ui.button("阅读全文").clicked() {
+        //                     app.set_view(ReaderView::new(
+        //                         preview.entry_id.to_owned(),
+        //                         preview.feed_id,
+        //                     ));
+        //                 }
+        //             }
+        //         });
 
-                ui.label("第一页（暂时还没写翻页的操作");
-            }
-            None => {
-                ui.label("该订阅尚未同步，现在同步吗？");
-                if ui.button("同步").clicked() {
-                    app.rss_client.try_start_sync_feed(self.id);
-                }
-            }
-        };
+        //         ui.label("第一页（暂时还没写翻页的操作");
+        //     }
+        //     None => {
+        //         ui.label("该订阅尚未同步，现在同步吗？");
+        //         if ui.button("同步").clicked() {
+        //             app.rss_client.try_start_sync_feed(self.id);
+        //         }
+        //     }
+        // };
     }
 }
 
@@ -274,7 +230,14 @@ impl Window for NewFeedWindow {
                     match url::Url::parse(&self.feed_url) {
                         Ok(url) => {
                             if ui.button("✔").on_hover_text("确定").clicked() {
-                                self.client.create_feed_with_folder(url, self.folder_id);
+                                match self.folder_id {
+                                    Some(folder_id) => {
+                                        self.client.create_feed_with_folder(url, folder_id);
+                                    }
+                                    None => {
+                                        self.client.create_feed(url);
+                                    }
+                                }
                                 self.is_open = false;
                             }
                         }

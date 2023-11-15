@@ -1,5 +1,5 @@
 pub mod rss_client {
-    use anyhow::{anyhow, Result};
+    use anyhow::Result;
     use ehttp;
     use feed_rs;
     use serde::{Deserialize, Serialize};
@@ -273,6 +273,239 @@ pub mod rss_client {
             );
 
             Ok(())
+        }
+    }
+}
+
+pub mod rss_client_ng {
+    use anyhow::Result;
+    use ehttp;
+    use feed_rs;
+    use serde::{Deserialize, Serialize};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        rc::Rc,
+        sync::{Arc, Mutex},
+    };
+
+    use uuid::Uuid;
+
+    use crate::{
+        article::ArticleUuid,
+        feed::{self, EntryUuid, FolderUuid},
+    };
+
+    #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+    pub struct FolderId(FolderUuid);
+
+    impl From<FolderUuid> for FolderId {
+        fn from(value: FolderUuid) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Uuid> for FolderId {
+        fn from(value: Uuid) -> Self {
+            Self::from(FolderUuid::from(value))
+        }
+    }
+
+    impl FolderId {
+        pub fn new() -> Self {
+            Self::from(Uuid::new_v4())
+        }
+    }
+
+    #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+    pub struct FeedId(EntryUuid);
+
+    impl From<EntryUuid> for FeedId {
+        fn from(value: EntryUuid) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Uuid> for FeedId {
+        fn from(value: Uuid) -> Self {
+            Self(EntryUuid::from(value))
+        }
+    }
+
+    impl FeedId {
+        pub fn new() -> Self {
+            Self::from(Uuid::new_v4())
+        }
+    }
+
+    #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+    pub struct EntryId(ArticleUuid);
+
+    impl From<ArticleUuid> for EntryId {
+        fn from(value: ArticleUuid) -> Self {
+            Self(value)
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct Folder {
+        folder: Rc<RefCell<feed::Folder>>,
+    }
+
+    impl Folder {
+        pub fn name(&self) -> String {
+            self.folder.borrow().title().to_owned()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct Feed {
+        entry: Rc<RefCell<feed::Entry>>,
+    }
+
+    impl From<Rc<RefCell<feed::Entry>>> for Feed {
+        fn from(entry: Rc<RefCell<feed::Entry>>) -> Self {
+            Self { entry }
+        }
+    }
+
+    impl Feed {
+        pub fn new_with_url(url: url::Url) -> Self {
+            Self::from(Rc::new(RefCell::new(feed::Entry::new(
+                "unnamed".to_owned(),
+                url,
+            ))))
+        }
+
+        pub fn get_name(&self) -> String {
+            self.entry.borrow().title().to_owned()
+        }
+    }
+
+    pub struct Entry {
+        pub id: EntryId,
+        pub feed_id: FeedId,
+        pub model: feed_rs::model::Entry,
+    }
+
+    #[derive(Default, Serialize, Deserialize, Clone)]
+    pub struct RssClient {
+        feed: Rc<RefCell<feed::Feed>>,
+    }
+
+    impl RssClient {
+        pub fn create_folder(&self, name: impl ToString) -> FolderId {
+            let result = self
+                .feed
+                .borrow_mut()
+                .add_empty_folder(feed::Folder::new(name));
+            FolderId::from(result)
+        }
+
+        // pub fn add_folder(&self, folder: Folder) -> Option<Folder> {
+        //     self.folders.lock().unwrap().insert(folder.id, folder)
+        // }
+
+        pub fn delete_folder(&self, id: FolderId) -> Result<()> {
+            self.feed
+                .borrow_mut()
+                .try_remove_folder_by_id(&id.0)
+                .unwrap();
+            Ok(())
+        }
+
+        pub fn get_folder(&self, id: &FolderId) -> Option<Folder> {
+            let result = self
+                .feed
+                .borrow()
+                .try_get_folder_by_id(&id.0)
+                .unwrap()
+                .to_owned();
+            Some(Folder { folder: result })
+        }
+
+        pub fn list_folder(&self) -> Vec<FolderId> {
+            self.feed
+                .borrow()
+                .get_all_folder_ids()
+                .into_iter()
+                .map(FolderId::from)
+                .collect()
+        }
+
+        pub fn create_feed(&self, url: url::Url) -> FeedId {
+            let entry = feed::Entry::new("unnamed".to_owned(), url);
+            FeedId::from(self.feed.borrow_mut().add_orphan_entry(entry))
+        }
+
+        pub fn create_feed_with_folder(&self, url: url::Url, folder_id: FolderId) -> FeedId {
+            let entry = feed::Entry::new("unnamed".to_owned(), url);
+            FeedId::from(
+                self.feed
+                    .borrow_mut()
+                    .try_add_entry_to_folder(entry, &folder_id.0)
+                    .unwrap(),
+            )
+        }
+
+        pub fn get_feed(&self, id: &FeedId) -> Option<Feed> {
+            self.feed
+                .borrow()
+                .try_get_entry_by_id(&id.0)
+                .ok()
+                .map(Feed::from)
+        }
+
+        pub fn delete_feed(&self, id: FeedId) -> Option<Feed> {
+            self.feed
+                .borrow_mut()
+                .try_remove_entry_by_id(&id.0)
+                .ok()
+                .map(Feed::from)
+        }
+
+        pub fn list_feed(&self) -> Vec<FeedId> {
+            self.feed
+                .borrow()
+                .get_all_entry_ids()
+                .into_iter()
+                .map(FeedId::from)
+                .collect()
+        }
+
+        pub fn list_orphan_feed(&self) -> Vec<FeedId> {
+            self.feed
+                .borrow()
+                .get_all_orphan_entry_ids()
+                .into_iter()
+                .map(FeedId::from)
+                .collect()
+        }
+
+        pub fn list_feed_by_folder(&self, folder_id: FolderId) -> Vec<FeedId> {
+            self.feed
+                .borrow()
+                .try_get_entry_ids_by_folder_id(&folder_id.0)
+                .unwrap()
+                .into_iter()
+                .map(FeedId::from)
+                .collect()
+        }
+
+        pub fn try_start_sync_folder(&self, id: FolderId) -> Result<()> {
+            for feed_id in self.list_feed_by_folder(id) {
+                self.try_start_sync_feed(feed_id)?;
+            }
+
+            Ok(())
+        }
+
+        pub fn try_start_sync_feed(&self, id: FeedId) -> Result<bool> {
+            self.feed.borrow_mut().try_sync_entry_by_id(&id.0)
+        }
+
+        pub fn feed_is_syncing(&self, id: FeedId) -> bool {
+            self.feed.borrow().is_entry_synchronizing(&id.0).unwrap()
         }
     }
 }
