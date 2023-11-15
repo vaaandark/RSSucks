@@ -63,11 +63,10 @@ impl From<opml::Head> for Head {
 #[allow(unused)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Entry {
+    /// Alias for subscription, takes precedence over `title`
+    alias: Option<String>,
     /// The title of the feed.
-    text: String,
-    /// Also the title, can be `None`,
-    /// for compatibility with the OPML standard.
-    title: Option<String>,
+    title: Arc<Mutex<String>>,
     /// URL of the RSS feed.
     pub xml_url: Url,
     /// Homepage URL of the feed.
@@ -86,10 +85,25 @@ pub struct Entry {
 impl Entry {
     /// Creates an `Entry` for a feed.
     #[allow(unused)]
-    pub fn new(text: impl ToString, xml_url: Url) -> Self {
+    pub fn new(xml_url: Url) -> Self {
         Entry {
-            title: Some(text.to_string()),
-            text: text.to_string(),
+            alias: None,
+            title: Arc::new(Mutex::new("No title".to_owned())),
+            html_url: xml_url.join("/").ok(),
+            xml_url,
+            articles: Arc::new(Mutex::new(BTreeSet::new())),
+            belong_to: None,
+            uuid: Uuid::new_v4().into(),
+            is_synchronizing: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    /// Creates an `Entry` with alias for a feed.
+    #[allow(unused)]
+    pub fn new_with_alias(alias: impl ToString, xml_url: Url) -> Self {
+        Entry {
+            alias: Some(alias.to_string()),
+            title: Arc::new(Mutex::new(alias.to_string())),
             html_url: xml_url.join("/").ok(),
             xml_url,
             articles: Arc::new(Mutex::new(BTreeSet::new())),
@@ -116,17 +130,18 @@ impl Entry {
 
     /// Returns the title of the entry.
     #[allow(unused)]
-    pub fn title(&self) -> &str {
-        &self.text
+    pub fn title(&self) -> String {
+        if let Some(title) = &self.alias {
+            title.to_owned()
+        } else {
+            self.title.lock().unwrap().to_owned()
+        }
     }
 
     /// Set the title of the entry.
     #[allow(unused)]
-    pub fn rename(&mut self, name: impl ToString) {
-        if self.title.is_some() {
-            self.title = Some(name.to_string());
-        }
-        self.text = name.to_string();
+    pub fn rename(&mut self, alias: impl ToString) {
+        self.alias = Some(alias.to_string());
     }
 }
 
@@ -134,13 +149,13 @@ impl TryFrom<opml::Entry> for Entry {
     type Error = Error;
     fn try_from(value: opml::Entry) -> Result<Self> {
         Ok(Entry {
+            alias: None,
             xml_url: value.xml_url.with_context(|| {
                 format!("Doesn't exist or is an invalid XML URL at {}", value.text)
             })?,
-            text: value.text,
             uuid: Uuid::new_v4().into(),
             articles: Arc::new(Mutex::new(BTreeSet::new())),
-            title: value.title,
+            title: Arc::new(Mutex::new(value.text)),
             html_url: value.html_url,
             belong_to: None,
             is_synchronizing: Arc::new(Mutex::new(false)),
@@ -154,10 +169,7 @@ impl TryFrom<opml::Entry> for Entry {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Folder {
     /// The title of the feed.
-    text: String,
-    /// Also the title, can be `None`,
-    /// for compatibility with the OPML standard.
-    title: Option<String>,
+    title: String,
     /// The IDs of entries which belong to this folder.
     entries: HashSet<EntryUuid>,
     /// UUID of this feed folder.
@@ -169,8 +181,7 @@ impl Folder {
     #[allow(unused)]
     pub fn new(name: impl ToString) -> Self {
         Folder {
-            text: name.to_string(),
-            title: Some(name.to_string()),
+            title: name.to_string(),
             entries: HashSet::new(),
             uuid: Uuid::new_v4().into(),
         }
@@ -179,16 +190,13 @@ impl Folder {
     /// Returns the title of the folder.
     #[allow(unused)]
     pub fn title(&self) -> &str {
-        &self.text
+        &self.title
     }
 
     /// Set the title of the folder.
     #[allow(unused)]
     pub fn rename(&mut self, name: impl ToString) {
-        if self.title.is_some() {
-            self.title = Some(name.to_string());
-        }
-        self.text = name.to_string();
+        self.title = name.to_string();
     }
 
     /// Returns the IDs of all entries in the folder.
@@ -228,8 +236,7 @@ impl TryFrom<opml::Opml> for Feed {
                         entries.insert(uuid);
                     }
                     let folder = Rc::new(RefCell::new(Folder {
-                        text: f.text,
-                        title: f.title,
+                        title: f.text,
                         entries,
                         uuid,
                     }));
@@ -294,7 +301,7 @@ impl Feed {
     pub fn get_all_entry_basic_infos(&self) -> impl Iterator<Item = (String, Url)> + '_ {
         self.entries_map
             .values()
-            .map(|e| (e.borrow().text.to_owned(), e.borrow().xml_url.to_owned()))
+            .map(|e| (e.borrow().title(), e.borrow().xml_url.to_owned()))
     }
 
     /// Returns the IDs of all entries.
@@ -484,7 +491,7 @@ impl Feed {
         self.entries_map
             .iter()
             .filter_map(move |(id, entry)| {
-                if entry.borrow().text.contains(name) {
+                if entry.borrow().title().contains(name) {
                     Some(*id)
                 } else {
                     None
@@ -499,7 +506,7 @@ impl Feed {
         self.folders_map
             .iter()
             .filter_map(move |(id, folder)| {
-                if folder.borrow().text.contains(name) {
+                if folder.borrow().title().contains(name) {
                     Some(*id)
                 } else {
                     None
@@ -523,6 +530,7 @@ impl Feed {
     pub fn try_sync_entry_by_id(&mut self, id: &EntryUuid) -> Result<bool> {
         let binding = self.try_get_entry_by_id(id)?;
         let entry = binding.try_borrow()?;
+        let title = entry.title.clone();
         let sync_lock = entry.is_synchronizing.clone();
         {
             let mut is_synchronizing = sync_lock.lock().unwrap();
@@ -542,6 +550,10 @@ impl Feed {
             )
             .expect("Failed to parse feed.");
             *sync_lock.lock().unwrap() = false;
+            *title.lock().unwrap() = feed
+                .title
+                .map(|text| text.content)
+                .unwrap_or("No title".to_owned());
             feed.entries.iter().for_each(|item| {
                 let article_id = ArticleUuid::new(item.updated, &entry_uuid, item.id.to_owned());
                 let mut article_id_set = article_id_set
@@ -640,11 +652,11 @@ mod test {
 
     #[test]
     fn new_entry() {
-        let entry1 = Entry::new(
+        let entry1 = Entry::new_with_alias(
             "sspai".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         );
-        let entry2 = Entry::new(
+        let entry2 = Entry::new_with_alias(
             "sspai".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         )
@@ -667,13 +679,7 @@ mod test {
             .unwrap()
             .borrow()
             .get_entry_ids()
-            .map(|id| {
-                feed.try_get_entry_by_id(id)
-                    .unwrap()
-                    .borrow()
-                    .text
-                    .to_owned()
-            })
+            .map(|id| feed.try_get_entry_by_id(id).unwrap().borrow().title())
             .collect::<Vec<_>>();
         names.sort();
         let mut expect = vec!["小众软件", "异次元软件世界"];
@@ -715,7 +721,7 @@ mod test {
         let feed1: Feed = opml1.try_into().unwrap();
         let opml2 = Opml::try_from_str(&read_to_string("./OPMLs/example3.opml").unwrap()).unwrap();
         let mut feed2: Feed = opml2.try_into().unwrap();
-        let entry = Entry::new(
+        let entry = Entry::new_with_alias(
             "少数派".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         );
@@ -732,7 +738,7 @@ mod test {
         let feed1: Feed = opml1.try_into().unwrap();
         let opml2 = Opml::try_from_str(&read_to_string("./OPMLs/example3.opml").unwrap()).unwrap();
         let mut feed2: Feed = opml2.try_into().unwrap();
-        let entry = Entry::new(
+        let entry = Entry::new_with_alias(
             "少数派".to_owned(),
             Url::parse("https://sspai.com/feed").unwrap(),
         );
