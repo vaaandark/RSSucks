@@ -86,10 +86,10 @@ pub struct Entry {
 impl Entry {
     /// Creates an `Entry` for a feed.
     #[allow(unused)]
-    pub fn new(text: String, xml_url: Url) -> Self {
+    pub fn new(text: impl ToString, xml_url: Url) -> Self {
         Entry {
-            title: Some(text.to_owned()),
-            text,
+            title: Some(text.to_string()),
+            text: text.to_string(),
             html_url: xml_url.join("/").ok(),
             xml_url,
             articles: Arc::new(Mutex::new(BTreeSet::new())),
@@ -122,11 +122,11 @@ impl Entry {
 
     /// Set the title of the entry.
     #[allow(unused)]
-    pub fn rename(&mut self, name: String) {
+    pub fn rename(&mut self, name: impl ToString) {
         if self.title.is_some() {
-            self.title = Some(name.to_owned());
+            self.title = Some(name.to_string());
         }
-        self.text = name;
+        self.text = name.to_string();
     }
 }
 
@@ -165,6 +165,17 @@ pub struct Folder {
 }
 
 impl Folder {
+    /// Creates a `Folder` for a feed.
+    #[allow(unused)]
+    pub fn new(name: impl ToString) -> Self {
+        Folder {
+            text: name.to_string(),
+            title: Some(name.to_string()),
+            entries: HashSet::new(),
+            uuid: Uuid::new_v4().into(),
+        }
+    }
+
     /// Returns the title of the folder.
     #[allow(unused)]
     pub fn title(&self) -> &str {
@@ -173,11 +184,11 @@ impl Folder {
 
     /// Set the title of the folder.
     #[allow(unused)]
-    pub fn rename(&mut self, name: String) {
+    pub fn rename(&mut self, name: impl ToString) {
         if self.title.is_some() {
-            self.title = Some(name.to_owned());
+            self.title = Some(name.to_string());
         }
-        self.text = name;
+        self.text = name.to_string();
     }
 
     /// Returns the IDs of all entries in the folder.
@@ -364,6 +375,15 @@ impl Feed {
             });
         self.folders_map.remove(id);
         Ok(())
+    }
+
+    /// Addes an empty folder into a feed.
+    #[allow(unused)]
+    pub fn add_empty_folder(&mut self, folder: Folder) -> FolderUuid {
+        let uuid = folder.uuid;
+        let folder = Rc::new(RefCell::new(folder));
+        self.folders_map.insert(uuid, folder);
+        uuid
     }
 
     /// Addes an orphan entry which doesn't belong to any folder.
