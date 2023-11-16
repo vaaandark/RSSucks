@@ -2,7 +2,6 @@ mod detail;
 mod preview;
 
 use crate::article::Article;
-use crate::feed::Feed;
 use ego_tree::iter::Edge;
 use egui::RichText;
 use lazy_static::lazy_static;
@@ -107,21 +106,18 @@ pub struct Builder<'a> {
     break_anywhere: bool,
     overflow_character: Option<char>,
     fulltext: Option<String>,
+    entry_id: &'a str,
+    feed_id: &'a str,
 }
 
 impl<'a> Builder<'a> {
-    pub fn from_article(article: &Article, feed: &Feed) -> Self {
+    pub fn from_article(article: &Article, entry_title: Option<&str>, feed_id: &str) -> Self {
         let updated = article.updated.map(|s| s.as_str());
         let published = article.published.map(|s| s.as_str());
         let title = &article.title;
         let link = article.links.get(0).map(|link| link.as_str());
         let summary = article.summary.as_ref();
         let catrgories = article.categories;
-        let entry_title = article.belong_to.and_then(|entry_uuid| {
-            feed.try_get_entry_by_id(&entry_uuid)
-                .ok()
-                .map(|entry_rc| entry_rc.borrow().title())
-        });
         let unread = article.unread;
 
         let (elements, fulltext) = if let Some(summary) = summary {
@@ -227,6 +223,8 @@ impl<'a> Builder<'a> {
             break_anywhere: true,
             overflow_character: Some('…'),
             fulltext,
+            entry_id: &article.id,
+            feed_id,
         }
     }
 

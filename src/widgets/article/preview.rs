@@ -13,6 +13,8 @@ pub struct Preview<'a> {
     fulltext: Option<String>,
     max_images_num: usize,
     title: String,
+    entry_id: String,
+    feed_id: String,
 }
 
 impl<'a> From<&Builder<'a>> for Preview<'a> {
@@ -26,6 +28,8 @@ impl<'a> From<&Builder<'a>> for Preview<'a> {
             fulltext: value.fulltext.clone(),
             max_images_num: 3,
             title: value.title.to_owned(),
+            entry_id: value.entry_id.to_owned(),
+            feed_id: value.feed_id.to_owned(),
         }
     }
 }
@@ -55,7 +59,8 @@ impl<'a> Widget for &Preview<'a> {
                     // Render content:
                     // First, render text.
                     let mut job = egui::text::LayoutJob::single_section(
-                        self.fulltext.map_or("No content...".to_owned(), |text| text),
+                        self.fulltext
+                            .map_or("No content...".to_owned(), |text| text),
                         egui::TextFormat::default(),
                     );
                     job.wrap = egui::text::TextWrapping {
@@ -90,7 +95,8 @@ impl<'a> Widget for &Preview<'a> {
                                             ui.add(
                                                 Image::from(src)
                                                     .fit_to_exact_size(egui::Vec2::new(
-                                                        f32::INFINITY, 128.0,
+                                                        f32::INFINITY,
+                                                        128.0,
                                                     ))
                                                     .rounding(Rounding::ZERO.at_least(10.0))
                                                     .show_loading_spinner(true),
