@@ -398,10 +398,7 @@ pub mod rss_client_ng {
         }
 
         pub fn new_with_url(url: url::Url) -> Self {
-            Self::from(Rc::new(RefCell::new(feed::Entry::new(
-                "unnamed".to_owned(),
-                url,
-            ))))
+            Self::from(Rc::new(RefCell::new(feed::Entry::new(url))))
         }
 
         pub fn get_name(&self) -> String {
@@ -477,12 +474,12 @@ pub mod rss_client_ng {
         }
 
         pub fn create_entry(&self, url: url::Url) -> EntryId {
-            let entry = feed::Entry::new("unnamed".to_owned(), url);
+            let entry = feed::Entry::new(url);
             EntryId::from(self.feed.borrow_mut().add_orphan_entry(entry))
         }
 
         pub fn create_entry_with_folder(&self, url: url::Url, folder_id: FolderId) -> EntryId {
-            let entry = feed::Entry::new("unnamed".to_owned(), url);
+            let entry = feed::Entry::new(url);
             EntryId::from(
                 self.feed
                     .borrow_mut()
