@@ -8,4 +8,4 @@ mod utils;
 mod view;
 mod widget;
 pub use app::RSSucks;
-pub mod renderer;
+pub mod widgets;

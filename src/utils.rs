@@ -1,5 +1,5 @@
 pub mod rss_client {
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
     use ehttp;
     use feed_rs;
     use serde::{Deserialize, Serialize};
