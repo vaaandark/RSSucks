@@ -1,4 +1,4 @@
-use egui::{Image, Margin, RichText, Rounding, Widget};
+use egui::{Image, Margin, Rect, RichText, Rounding, Sense, Widget};
 use uuid::Uuid;
 
 use crate::article::ArticleUuid;
@@ -37,6 +37,8 @@ impl<'a> From<Builder<'a>> for Preview {
 impl Widget for &Preview {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
+            let mut child_ui =
+                ui.child_ui_with_id_source(ui.max_rect(), *ui.layout(), self.scroll_area_id);
             egui::Frame::none()
                 .inner_margin(Margin::same(32.0))
                 .outer_margin(Margin::symmetric(
@@ -49,7 +51,7 @@ impl Widget for &Preview {
                 ))
                 .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
                 .rounding(Rounding::ZERO.at_least(10.0))
-                .show(ui, |ui: &mut egui::Ui| {
+                .show(&mut child_ui, |ui: &mut egui::Ui| {
                     // Set the spacing between header and content.
                     ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
                     ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
@@ -112,7 +114,30 @@ impl Widget for &Preview {
                         y: 0.0,
                     });
                 });
+            let side_blank_width = if ui.max_rect().width() > 1024.0 {
+                (ui.max_rect().width() - 1024.0) / 2.0
+            } else {
+                0.0
+            };
+            let response = ui.interact(
+                Rect::from_min_size(
+                    [
+                        side_blank_width + ui.next_widget_position().x,
+                        ui.next_widget_position().y + 8.0,
+                    ]
+                    .into(),
+                    [
+                        child_ui.min_size().x - side_blank_width * 2.0,
+                        child_ui.min_size().y - 16.0,
+                    ]
+                    .into(),
+                ),
+                child_ui.id(),
+                Sense::click(),
+            );
+            ui.allocate_space(child_ui.min_size());
+            response
         })
-        .response
+        .inner
     }
 }

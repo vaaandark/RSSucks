@@ -106,8 +106,7 @@ impl View for FeedFlowView {
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for preview in self.cached_previews.borrow().as_ref().unwrap() {
-                        ui.add(preview);
-                        if ui.button("阅读全文").clicked() {
+                        if ui.add(preview).clicked() {
                             app.set_view(ReaderView::new(ArticleId::from(
                                 preview.article_id.clone(),
                             )));
