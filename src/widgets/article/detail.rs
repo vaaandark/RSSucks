@@ -24,25 +24,6 @@ impl<'a> From<Builder<'a>> for Detail {
     }
 }
 
-// fn richtext_generator(text: &str, dom_stack: &[ElementType<'_>]) -> egui::RichText {
-//     let richtext = dom_stack.iter().fold(
-//         egui::RichText::new(text).size(16.0).line_height(Some(28.0)),
-//         |richtext, element| match element {
-//             ElementType::H1 => richtext.strong().size(32.0),
-//             ElementType::H2 => richtext.strong().size(24.0),
-//             ElementType::H3 => richtext.strong().size(18.72),
-//             ElementType::H4 => richtext.strong().size(16.0),
-//             ElementType::H5 => richtext.strong().size(13.28),
-//             ElementType::H6 => richtext.strong().size(10.72),
-//             ElementType::Em => richtext.italics(),
-//             ElementType::Strong => richtext.strong(),
-//             ElementType::Code => richtext.code(),
-//             _ => richtext,
-//         },
-//     );
-//     richtext
-// }
-
 impl<'a> Widget for &Detail {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
@@ -100,7 +81,8 @@ impl<'a> Widget for &Detail {
                                 }
                                 if let Some(published) = &self.published {
                                     ui.label(
-                                        RichText::new("\tpublished at ").size(HEADER_SMALL_TEXT_SIZE),
+                                        RichText::new("\tpublished at ")
+                                            .size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                     ui.label(RichText::new(published).size(HEADER_SMALL_TEXT_SIZE));
                                 }
