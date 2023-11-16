@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use egui::Widget;
 use uuid::Uuid;
@@ -16,24 +17,26 @@ pub trait Window {
     fn is_open(&self) -> bool;
 }
 
+#[derive(Clone)]
 pub struct ReaderView {
     article_id: ArticleId,
-    cached_detail: RefCell<Option<article::Detail>>,
+    parent_view: Option<Rc<Box<dyn View>>>,
+    cached_detail: Rc<RefCell<Option<article::Detail>>>,
 }
 
 impl ReaderView {
-    pub fn new(article_id: ArticleId) -> Self {
+    pub fn new(article_id: ArticleId, parent_view: Option<Rc<Box<dyn View>>>) -> Self {
         Self {
             article_id,
-            cached_detail: RefCell::new(None),
+            parent_view,
+            cached_detail: Rc::new(RefCell::new(None)),
         }
     }
 }
 
 impl View for ReaderView {
-    fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
+    fn show(&self, app: Rc<RSSucks>, ui: &mut egui::Ui) {
         if self.cached_detail.borrow().is_none() {
-            let feed = app.rss_client.get();
             let article = app
                 .rss_client
                 .get_article_by_id(&self.article_id)
@@ -42,7 +45,8 @@ impl View for ReaderView {
             let detail = article::Detail::from(article::Builder::from_article(
                 article.lock().as_ref().unwrap(),
                 self.article_id.get(),
-                feed,
+                self.parent_view.as_ref().map(Rc::clone),
+                Rc::clone(&app),
             ));
             self.cached_detail.replace(Some(detail));
         }
@@ -50,11 +54,12 @@ impl View for ReaderView {
     }
 }
 
+#[derive(Clone)]
 pub struct FeedFlowView {
     id: EntryId,
     page: usize,
     per_page: usize,
-    cached_previews: RefCell<Option<Vec<article::Preview>>>,
+    cached_previews: Rc<RefCell<Option<Vec<article::Preview>>>>,
 }
 
 impl FeedFlowView {
@@ -63,13 +68,13 @@ impl FeedFlowView {
             id,
             page: 1,
             per_page: 20,
-            cached_previews: RefCell::new(None),
+            cached_previews: Rc::new(RefCell::new(None)),
         }
     }
 }
 
 impl View for FeedFlowView {
-    fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
+    fn show(&self, app: Rc<RSSucks>, ui: &mut egui::Ui) {
         if app.rss_client.entry_is_syncing(self.id) {
             ui.spinner();
         }
@@ -82,6 +87,8 @@ impl View for FeedFlowView {
 
         match articles {
             Ok(articles) => {
+                let current_view: Rc<Box<dyn View>> = Rc::new(Box::new((*self).clone()));
+
                 if self.cached_previews.borrow().is_none() {
                     let previews = articles
                         .into_iter()
@@ -89,14 +96,14 @@ impl View for FeedFlowView {
                         .take(self.per_page)
                         .map(ArticleId::from)
                         .map(|article_id| {
-                            let feed = app.rss_client.get();
                             let article =
                                 app.rss_client.get_article_by_id(&article_id).unwrap().get();
                             let article = article.lock();
                             let builder = article::Builder::from_article(
                                 article.as_ref().unwrap(),
                                 article_id.get(),
-                                feed,
+                                Some(Rc::clone(&current_view)),
+                                Rc::clone(&app),
                             );
                             article::Preview::from(builder)
                         })
@@ -107,14 +114,15 @@ impl View for FeedFlowView {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for preview in self.cached_previews.borrow().as_ref().unwrap() {
                         if ui.add(preview).clicked() {
-                            app.set_view(ReaderView::new(ArticleId::from(
-                                preview.article_id.clone(),
-                            )));
+                            app.set_view(Rc::new(Box::new(ReaderView::new(
+                                ArticleId::from(preview.article_id.clone()),
+                                Some(Rc::clone(&current_view)),
+                            ))));
                         }
                     }
                 });
 
-                ui.label("第一页（暂时还没写翻页的操作");
+                // ui.label("第一页（暂时还没写翻页的操作");
             }
             Err(_) => {
                 ui.label("该订阅尚未同步，现在同步吗？");
@@ -313,14 +321,14 @@ impl<'app> LeftSidePanel<'app> {
 }
 
 pub trait View {
-    fn show(&self, app: &RSSucks, ui: &mut egui::Ui);
+    fn show(&self, app: Rc<RSSucks>, ui: &mut egui::Ui);
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DummyView {}
 
 impl View for DummyView {
-    fn show(&self, _app: &RSSucks, ui: &mut egui::Ui) {
+    fn show(&self, _app: Rc<RSSucks>, ui: &mut egui::Ui) {
         ui.heading("订阅分类或者订阅本身的标题");
         ui.label("一些关于订阅或者分类的介绍 blablablabla");
 

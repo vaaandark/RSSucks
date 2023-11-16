@@ -7,5 +7,6 @@ mod opml;
 mod utils;
 mod view;
 mod widget;
+pub use app::App;
 pub use app::RSSucks;
 pub mod widgets;

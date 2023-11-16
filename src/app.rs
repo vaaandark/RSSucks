@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 
@@ -9,15 +10,17 @@ use crate::{
 };
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone)]
 #[serde(default)]
 pub struct RSSucks {
     pub rss_client: RssClient,
 
     #[serde(skip)]
-    pub view: Option<Box<dyn View>>,
+    pub view: RefCell<Option<Rc<Box<dyn View>>>>,
     #[serde(skip)]
-    pub next_view: RefCell<Option<Box<dyn View>>>,
+    pub next_view: RefCell<Option<Rc<Box<dyn View>>>>,
+
+    switch_cnt: i32,
 
     #[serde(skip)]
     windows: Arc<Mutex<Vec<Box<dyn view::Window>>>>,
@@ -25,7 +28,13 @@ pub struct RSSucks {
     adding_windows: Arc<Mutex<Vec<Box<dyn view::Window>>>>,
 }
 
-impl RSSucks {
+#[derive(serde::Deserialize, serde::Serialize, Default, Clone)]
+#[serde(default)]
+pub struct App {
+    app: Rc<RSSucks>,
+}
+
+impl App {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -56,7 +65,9 @@ impl RSSucks {
 
         Default::default()
     }
+}
 
+impl RSSucks {
     pub fn add_window(&self, window: impl view::Window + 'static) {
         self.adding_windows
             .lock()
@@ -65,7 +76,7 @@ impl RSSucks {
     }
 }
 
-impl eframe::App for RSSucks {
+impl eframe::App for App {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
@@ -76,36 +87,39 @@ impl eframe::App for RSSucks {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui_extras::install_image_loaders(ctx);
 
-        view::LeftSidePanel::new(self).show(ctx);
+        view::LeftSidePanel::new(&self.app).show(ctx);
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            if let Some(view) = self.view.as_ref() {
-                view.show(self, ui);
+            if let Some(view) = self.app.view.borrow().as_ref() {
+                view.show(Rc::clone(&self.app), ui);
             }
         });
 
-        for window in self.windows.lock().unwrap().iter_mut() {
+        if let Some(next_view) = self.app.next_view.replace(None) {
+            self.app.view.borrow_mut().replace(next_view);
+        };
+
+        for window in self.app.windows.lock().unwrap().iter_mut() {
             window.show(ctx);
         }
 
-        self.windows
+        self.app
+            .windows
             .lock()
             .unwrap()
-            .extend(self.adding_windows.lock().unwrap().drain(..));
+            .extend(self.app.adding_windows.lock().unwrap().drain(..));
 
-        self.windows
+        self.app
+            .windows
             .lock()
             .expect("rare error detected")
             .retain(|window| window.is_open());
-
-        if let Some(view) = self.next_view.replace(None) {
-            self.view.replace(view);
-        };
     }
 }
 
 impl RSSucks {
-    pub fn set_view(&self, view: impl View + 'static) -> &Self {
-        self.next_view.replace(Some(Box::new(view)));
+    pub fn set_view(&self, view: Rc<Box<dyn View>>) -> &Self {
+        self.next_view.replace(Some(view));
         self
     }
 }

@@ -1,4 +1,8 @@
+use std::rc::Rc;
+
 use egui::{Image, Margin, RichText, Rounding, Widget};
+
+use crate::{view::View, RSSucks};
 
 use super::{Builder, Element, ElementType};
 
@@ -9,6 +13,8 @@ pub struct Detail {
     updated: Option<String>,
     published: Option<String>,
     elements: Option<Vec<Element>>,
+    app: Rc<RSSucks>,
+    parent_view: Option<Rc<Box<dyn View>>>,
 }
 
 impl<'a> From<Builder<'a>> for Detail {
@@ -20,6 +26,8 @@ impl<'a> From<Builder<'a>> for Detail {
             updated: value.updated.map(|s| s.to_owned()),
             published: value.published.map(|s| s.to_owned()),
             elements: value.elements,
+            app: value.app,
+            parent_view: value.parent_view,
         }
     }
 }
@@ -48,6 +56,11 @@ impl Widget for &Detail {
                         .outer_margin(Margin::same(16.0))
                         // .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
                         .show(ui, |ui| {
+                            if ui.button("⬅ 返回").clicked() {
+                                if let Some(view) = &self.parent_view {
+                                    self.app.set_view(Rc::clone(view));
+                                }
+                            }
                             const HEADER_LARGE_TEXT_SIZE: f32 = 32.0;
                             const HEADER_SMALL_TEXT_SIZE: f32 = 12.0;
                             ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use egui::{Response, Ui, Widget};
 
 use crate::{
@@ -24,7 +26,8 @@ impl<'a> Widget for FeedMinimal<'a> {
                 let feed_button = ui.button(feed.get_name());
 
                 if feed_button.clicked() {
-                    self.app.set_view(view::FeedFlowView::new(self.id));
+                    self.app
+                        .set_view(Rc::new(Box::new(view::FeedFlowView::new(self.id))));
                 }
 
                 if self.app.rss_client.entry_is_syncing(self.id) {

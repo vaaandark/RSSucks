@@ -1,12 +1,12 @@
 mod detail;
 mod preview;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::article::Article;
 use crate::article::ArticleUuid;
-use crate::feed::Feed;
+use crate::view::View;
+use crate::RSSucks;
 use ego_tree::iter::Edge;
 use egui::RichText;
 use lazy_static::lazy_static;
@@ -108,14 +108,18 @@ pub struct Builder<'a> {
     overflow_character: Option<char>,
     fulltext: Option<String>,
     article_id: ArticleUuid,
+    parent_view: Option<Rc<Box<dyn View>>>,
+    app: Rc<RSSucks>,
 }
 
 impl<'a> Builder<'a> {
     pub fn from_article(
         article: &'a Article,
         article_id: ArticleUuid,
-        feed: Rc<RefCell<Feed>>,
+        parent_view: Option<Rc<Box<dyn View>>>,
+        app: Rc<RSSucks>,
     ) -> Self {
+        let feed = app.rss_client.get();
         let updated = article.updated.as_deref();
         let published = article.published.as_deref();
         let title = &article.title;
@@ -237,6 +241,8 @@ impl<'a> Builder<'a> {
             overflow_character: Some('…'),
             fulltext,
             article_id,
+            app,
+            parent_view,
         }
     }
 
