@@ -5,17 +5,24 @@ use serde::{Deserialize, Serialize};
 /// Universally Unique Identifier for [`Article`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct ArticleUuid {
-    update: Option<DateTime<Utc>>,
+    updated: Option<DateTime<Utc>>,
+    published: Option<DateTime<Utc>>,
     feed_id: EntryUuid,
     id: String,
 }
 
 impl ArticleUuid {
-    pub fn new(update: Option<DateTime<Utc>>, feed_id: &EntryUuid, id: String) -> Self {
+    pub fn new(
+        update: Option<DateTime<Utc>>,
+        publish: Option<DateTime<Utc>>,
+        feed_id: &EntryUuid,
+        id: impl ToString,
+    ) -> Self {
         Self {
-            update,
+            updated: update,
+            published: publish,
             feed_id: *feed_id,
-            id,
+            id: id.to_string(),
         }
     }
 }
