@@ -1,6 +1,6 @@
 {
-  "name": "egui Template PWA",
-  "short_name": "egui-template-pwa",
+  "name": "Rust SuckS",
+  "short_name": "rssucks",
   "icons": [
     {
       "src": "./icon-256.png",
