@@ -43,7 +43,7 @@ impl<'a> From<Builder<'a>> for Detail {
 //     richtext
 // }
 
-impl<'a> Widget for &Detail {
+impl Widget for &Detail {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()
@@ -100,7 +100,8 @@ impl<'a> Widget for &Detail {
                                 }
                                 if let Some(published) = &self.published {
                                     ui.label(
-                                        RichText::new("\tpublished at ").size(HEADER_SMALL_TEXT_SIZE),
+                                        RichText::new("\tpublished at ")
+                                            .size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                     ui.label(RichText::new(published).size(HEADER_SMALL_TEXT_SIZE));
                                 }

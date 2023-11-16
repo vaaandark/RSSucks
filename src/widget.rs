@@ -27,8 +27,6 @@ impl<'a> Widget for FeedMinimal<'a> {
                     self.app.set_view(view::FeedFlowView::new(self.id));
                 }
 
-                if feed_button.double_clicked() {}
-
                 if self.app.rss_client.entry_is_syncing(self.id) {
                     ui.spinner();
                 }

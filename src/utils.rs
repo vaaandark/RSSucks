@@ -314,6 +314,12 @@ pub mod rss_client_ng {
         }
     }
 
+    impl Default for FolderId {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
     pub struct EntryId(EntryUuid);
 
@@ -336,6 +342,12 @@ pub mod rss_client_ng {
 
         pub fn new() -> Self {
             Self::from(Uuid::new_v4())
+        }
+    }
+
+    impl Default for EntryId {
+        fn default() -> Self {
+            Self::new()
         }
     }
 

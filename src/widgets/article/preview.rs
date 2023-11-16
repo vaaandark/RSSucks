@@ -34,7 +34,7 @@ impl<'a> From<Builder<'a>> for Preview {
     }
 }
 
-impl<'a> Widget for &Preview {
+impl Widget for &Preview {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()

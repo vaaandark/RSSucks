@@ -57,7 +57,7 @@ pub struct FeedFlowView {
     cached_previews: RefCell<Option<Vec<article::Preview>>>,
 }
 
-impl<'a> FeedFlowView {
+impl FeedFlowView {
     pub fn new(id: EntryId) -> Self {
         Self {
             id,
@@ -303,11 +303,11 @@ impl<'app> LeftSidePanel<'app> {
             }
 
             for folder_id in self.app.rss_client.list_folder() {
-                ui.add(CollapsingFolder::new(&self.app, folder_id));
+                ui.add(CollapsingFolder::new(self.app, folder_id));
             }
 
             for feed_id in self.app.rss_client.list_orphan_entry() {
-                ui.add(widget::FeedMinimal::new(&self.app, feed_id));
+                ui.add(widget::FeedMinimal::new(self.app, feed_id));
             }
         });
     }
