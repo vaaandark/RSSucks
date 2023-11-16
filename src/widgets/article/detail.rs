@@ -60,7 +60,7 @@ impl<'a> Widget for &Detail {
                 .rounding(Rounding::ZERO.at_least(10.0))
                 .show(ui, |ui| {
                     // we will control the spacing manually later
-                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 16.0);
 
                     // Render header:
                     egui::Frame::none()
@@ -69,6 +69,7 @@ impl<'a> Widget for &Detail {
                         .show(ui, |ui| {
                             const HEADER_LARGE_TEXT_SIZE: f32 = 32.0;
                             const HEADER_SMALL_TEXT_SIZE: f32 = 12.0;
+                            ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
 
                             // title
                             if let Some(link) = &self.link {
@@ -99,19 +100,19 @@ impl<'a> Widget for &Detail {
                                 }
                                 if let Some(published) = &self.published {
                                     ui.label(
-                                        RichText::new("\tpublished: ").size(HEADER_SMALL_TEXT_SIZE),
+                                        RichText::new("\tpublished at ").size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                     ui.label(RichText::new(published).size(HEADER_SMALL_TEXT_SIZE));
                                 }
                                 if let Some(updated) = &self.updated {
                                     ui.label(
-                                        RichText::new("\tupdated: ").size(HEADER_SMALL_TEXT_SIZE),
+                                        RichText::new("\tupdated at ").size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                     ui.label(RichText::new(updated).size(HEADER_SMALL_TEXT_SIZE));
                                 }
                             });
                         });
-                    ui.separator();
+                    // ui.separator();
 
                     // Render content:
                     ui.scope(|ui| {
@@ -125,6 +126,7 @@ impl<'a> Widget for &Detail {
                                         while idx < elements_len {
                                             ui.horizontal_wrapped(|ui| {
                                                 while let Some(element) = elements.get(idx) {
+                                                    println!("{:?}", element.typ);
                                                     match element.typ {
                                                         ElementType::Paragraph => {
                                                             if let Some(richtext) = &element.text {

@@ -21,7 +21,7 @@ lazy_static! {
     static ref CONTINUOUS_WHITESPACE_PATTERN: Regex = Regex::new(r"\s+").unwrap();
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum ElementType {
     Paragraph,
     Heading,
@@ -168,6 +168,7 @@ impl<'a> Builder<'a> {
                             };
                             fulltext += &text;
                             element.text = Some(stylize_text(&element, text));
+                            elements.push(element);
                         }
                         scraper::Node::Element(tag) => {
                             dom_stack.push(tag.name().to_owned());
