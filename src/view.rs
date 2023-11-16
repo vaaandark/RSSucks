@@ -1,5 +1,4 @@
-use std::borrow::BorrowMut;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 
 use egui::Widget;
 use uuid::Uuid;
@@ -58,12 +57,12 @@ pub struct FeedFlowView {
     cached_previews: RefCell<Option<Vec<article::Preview>>>,
 }
 
-impl<'a> FeedFlowView {
+impl FeedFlowView {
     pub fn new(id: EntryId) -> Self {
         Self {
             id,
             page: 1,
-            per_page: 5,
+            per_page: 20,
             cached_previews: RefCell::new(None),
         }
     }
@@ -86,6 +85,8 @@ impl View for FeedFlowView {
                 if self.cached_previews.borrow().is_none() {
                     let previews = articles
                         .into_iter()
+                        .skip((self.page - 1) * self.per_page)
+                        .take(self.per_page)
                         .map(ArticleId::from)
                         .map(|article_id| {
                             let feed = app.rss_client.get();
@@ -118,7 +119,7 @@ impl View for FeedFlowView {
             Err(_) => {
                 ui.label("该订阅尚未同步，现在同步吗？");
                 if ui.button("同步").clicked() {
-                    app.rss_client.try_start_sync_entry(self.id);
+                    app.rss_client.try_start_sync_entry(self.id).unwrap();
                 }
             }
         };
@@ -132,6 +133,7 @@ pub struct InfoWindow {
     message: String,
 }
 
+#[allow(unused)]
 impl InfoWindow {
     pub fn new(title: String, message: String) -> Self {
         Self {
@@ -300,11 +302,11 @@ impl<'app> LeftSidePanel<'app> {
             }
 
             for folder_id in self.app.rss_client.list_folder() {
-                ui.add(CollapsingFolder::new(&self.app, folder_id));
+                ui.add(CollapsingFolder::new(self.app, folder_id));
             }
 
             for feed_id in self.app.rss_client.list_orphan_entry() {
-                ui.add(widget::FeedMinimal::new(&self.app, feed_id));
+                ui.add(widget::FeedMinimal::new(self.app, feed_id));
             }
         });
     }

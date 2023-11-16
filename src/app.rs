@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    rc::Rc,
     sync::{Arc, Mutex},
 };
 
@@ -77,7 +76,7 @@ impl eframe::App for RSSucks {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui_extras::install_image_loaders(ctx);
 
-        view::LeftSidePanel::new(&self).show(ctx);
+        view::LeftSidePanel::new(self).show(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             if let Some(view) = self.view.as_ref() {
                 view.show(self, ui);
@@ -98,11 +97,8 @@ impl eframe::App for RSSucks {
             .expect("rare error detected")
             .retain(|window| window.is_open());
 
-        match self.next_view.replace(None) {
-            Some(view) => {
-                self.view.replace(view);
-            }
-            None => {}
+        if let Some(view) = self.next_view.replace(None) {
+            self.view.replace(view);
         };
     }
 }

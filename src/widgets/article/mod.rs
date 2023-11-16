@@ -20,7 +20,7 @@ lazy_static! {
     static ref CONTINUOUS_WHITESPACE_PATTERN: Regex = Regex::new(r"\s+").unwrap();
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 enum ElementType {
     Paragraph,
     Heading,
@@ -29,13 +29,9 @@ enum ElementType {
     Separator,
     CodeBlock,
     LineBreak,
-    Others,
-}
 
-impl Default for ElementType {
-    fn default() -> Self {
-        ElementType::Others
-    }
+    #[default]
+    Others,
 }
 
 #[derive(Default, Clone)]
@@ -120,10 +116,10 @@ impl<'a> Builder<'a> {
         article_id: ArticleUuid,
         feed: Rc<RefCell<Feed>>,
     ) -> Self {
-        let updated = article.updated.as_ref().map(|s| s.as_str());
-        let published = article.published.as_ref().map(|s| s.as_str());
+        let updated = article.updated.as_deref();
+        let published = article.published.as_deref();
         let title = &article.title;
-        let link = article.links.get(0).map(|link| link.as_str());
+        let link = article.links.first().map(|link| link.as_str());
         let summary = article.summary.as_ref();
         let _catrgories = &article.categories;
         let entry_title = article.belong_to.and_then(|entry_uuid| {
@@ -145,7 +141,7 @@ impl<'a> Builder<'a> {
                 match edge {
                     Edge::Open(node) => match node.value() {
                         scraper::Node::Text(ref text) => {
-                            if text.trim().len() == 0 {
+                            if text.trim().is_empty() {
                                 // in case that it is not a meaningless new empty line in html document
                                 continue;
                             }
@@ -154,7 +150,7 @@ impl<'a> Builder<'a> {
                                 // the text is not preformatted
                                 // delete continuous whitespace, \n and \r
                                 CONTINUOUS_WHITESPACE_PATTERN
-                                    .replace_all(&text, " ")
+                                    .replace_all(text, " ")
                                     .trim_matches(|ch: char| ch == '\n' || ch == 'r')
                                     .to_owned()
                             } else {

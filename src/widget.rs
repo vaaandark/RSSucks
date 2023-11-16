@@ -27,8 +27,6 @@ impl<'a> Widget for FeedMinimal<'a> {
                     self.app.set_view(view::FeedFlowView::new(self.id));
                 }
 
-                if feed_button.double_clicked() {}
-
                 if self.app.rss_client.entry_is_syncing(self.id) {
                     ui.spinner();
                 }
@@ -44,18 +42,6 @@ impl<'a> Widget for FeedMinimal<'a> {
         })
         .response
     }
-}
-
-pub struct FeedPreview {
-    id: EntryId,
-}
-
-pub struct FeedFlow {
-    id: EntryId,
-}
-
-pub struct FeedConfig {
-    id: EntryId,
 }
 
 pub struct CollapsingFolder<'app> {
@@ -88,7 +74,7 @@ impl<'app> Widget for CollapsingFolder<'app> {
                     ));
                 }
                 if ui.button("🗙").on_hover_text("删除文件夹").clicked() {
-                    self.app.rss_client.delete_folder(self.folder_id);
+                    self.app.rss_client.delete_folder(self.folder_id).unwrap();
                 }
             });
             for feed_id in self.app.rss_client.list_entry_by_folder(self.folder_id) {

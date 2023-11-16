@@ -24,7 +24,7 @@ impl<'a> From<Builder<'a>> for Detail {
     }
 }
 
-impl<'a> Widget for &Detail {
+impl Widget for &Detail {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()
