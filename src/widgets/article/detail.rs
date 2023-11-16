@@ -126,7 +126,7 @@ impl<'a> Widget for &Detail {
                                         while idx < elements_len {
                                             ui.horizontal_wrapped(|ui| {
                                                 while let Some(element) = elements.get(idx) {
-                                                    println!("{:?}", element.typ);
+                                                    // println!("{:?}", element.typ);
                                                     match element.typ {
                                                         ElementType::Paragraph => {
                                                             if let Some(richtext) = &element.text {
