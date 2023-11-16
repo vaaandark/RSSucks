@@ -1,5 +1,4 @@
-use std::borrow::BorrowMut;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 
 use egui::Widget;
 use uuid::Uuid;
@@ -63,7 +62,7 @@ impl<'a> FeedFlowView {
         Self {
             id,
             page: 1,
-            per_page: 5,
+            per_page: 20,
             cached_previews: RefCell::new(None),
         }
     }
@@ -86,6 +85,8 @@ impl View for FeedFlowView {
                 if self.cached_previews.borrow().is_none() {
                     let previews = articles
                         .into_iter()
+                        .skip((self.page - 1) * self.per_page)
+                        .take(self.per_page)
                         .map(ArticleId::from)
                         .map(|article_id| {
                             let feed = app.rss_client.get();
@@ -119,7 +120,7 @@ impl View for FeedFlowView {
             Err(_) => {
                 ui.label("该订阅尚未同步，现在同步吗？");
                 if ui.button("同步").clicked() {
-                    app.rss_client.try_start_sync_entry(self.id);
+                    app.rss_client.try_start_sync_entry(self.id).unwrap();
                 }
             }
         };
@@ -133,6 +134,7 @@ pub struct InfoWindow {
     message: String,
 }
 
+#[allow(unused)]
 impl InfoWindow {
     pub fn new(title: String, message: String) -> Self {
         Self {

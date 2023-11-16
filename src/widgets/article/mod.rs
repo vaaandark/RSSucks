@@ -1,7 +1,6 @@
 mod detail;
 mod preview;
 
-use std::cell::Ref;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -126,14 +125,14 @@ impl<'a> Builder<'a> {
         let title = &article.title;
         let link = article.links.get(0).map(|link| link.as_str());
         let summary = article.summary.as_ref();
-        let catrgories = &article.categories;
+        // let catrgories = &article.categories;
         let entry_title = article.belong_to.and_then(|entry_uuid| {
             feed.borrow()
                 .try_get_entry_by_id(&entry_uuid)
                 .ok()
                 .map(|entry_rc| entry_rc.borrow().title().to_owned())
         });
-        let unread = article.unread;
+        // let unread = article.unread;
 
         let (elements, fulltext) = if let Some(summary) = summary {
             let fragment = scraper::Html::parse_fragment(summary);
@@ -220,7 +219,7 @@ impl<'a> Builder<'a> {
                     },
 
                     Edge::Close(node) => {
-                        if let scraper::Node::Element(tag) = node.value() {
+                        if let scraper::Node::Element(_) = node.value() {
                             element_stack.pop();
                         }
                     }
@@ -243,9 +242,5 @@ impl<'a> Builder<'a> {
             fulltext,
             article_id,
         }
-    }
-
-    fn to_preview(self) -> Preview {
-        Preview::from(self)
     }
 }

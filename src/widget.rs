@@ -46,18 +46,6 @@ impl<'a> Widget for FeedMinimal<'a> {
     }
 }
 
-pub struct FeedPreview {
-    id: EntryId,
-}
-
-pub struct FeedFlow {
-    id: EntryId,
-}
-
-pub struct FeedConfig {
-    id: EntryId,
-}
-
 pub struct CollapsingFolder<'app> {
     app: &'app RSSucks,
     folder_id: FolderId,
@@ -88,7 +76,7 @@ impl<'app> Widget for CollapsingFolder<'app> {
                     ));
                 }
                 if ui.button("🗙").on_hover_text("删除文件夹").clicked() {
-                    self.app.rss_client.delete_folder(self.folder_id);
+                    self.app.rss_client.delete_folder(self.folder_id).unwrap();
                 }
             });
             for feed_id in self.app.rss_client.list_entry_by_folder(self.folder_id) {

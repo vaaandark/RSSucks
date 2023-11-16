@@ -1,7 +1,7 @@
 use egui::{Image, Margin, RichText, Rounding, Widget};
 use uuid::Uuid;
 
-use crate::{article::ArticleUuid, feed::EntryUuid};
+use crate::article::ArticleUuid;
 
 use super::{Builder, Element, ElementType};
 
