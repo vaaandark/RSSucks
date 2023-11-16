@@ -1,11 +1,13 @@
+use std::borrow::BorrowMut;
 use std::cell::{Ref, RefCell};
 
 use egui::Widget;
 use uuid::Uuid;
 
+use crate::utils::rss_client_ng::ArticleId;
+use crate::widgets::article;
 use crate::{
-    renderer,
-    utils::rss_client::{FeedId, FolderId, RssClient},
+    utils::rss_client_ng::{EntryId, FolderId, RssClient},
     widget::{self, CollapsingFolder},
     RSSucks,
 };
@@ -16,16 +18,14 @@ pub trait Window {
 }
 
 pub struct ReaderView {
-    entry_id_in_feed: String,
-    feed_id: FeedId,
-    cached_detail: RefCell<Option<renderer::Detail>>,
+    article_id: ArticleId,
+    cached_detail: RefCell<Option<article::Detail>>,
 }
 
 impl ReaderView {
-    pub fn new(entry_id_in_feed: String, feed_id: FeedId) -> Self {
+    pub fn new(article_id: ArticleId) -> Self {
         Self {
-            entry_id_in_feed,
-            feed_id,
+            article_id,
             cached_detail: RefCell::new(None),
         }
     }
@@ -34,73 +34,32 @@ impl ReaderView {
 impl View for ReaderView {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
         if self.cached_detail.borrow().is_none() {
-            let feed = app.rss_client.get_feed(&self.feed_id).unwrap();
-            let entry = feed
-                .model
-                .as_ref()
+            let feed = app.rss_client.get();
+            let article = app
+                .rss_client
+                .get_article_by_id(&self.article_id)
                 .unwrap()
-                .entries
-                .iter()
-                .find(|entry| entry.id == self.entry_id_in_feed)
-                .unwrap();
-            let summary = entry
-                .summary
-                .iter()
-                .next()
-                .map(|content| content.content.clone())
-                .unwrap_or("no content".to_owned());
-            let content = entry
-                .content
-                .iter()
-                .next()
-                .map(|content| content.body.as_ref().unwrap_or(&summary).clone())
-                .unwrap_or(summary.to_owned());
-            let time = entry
-                .updated
-                .iter()
-                .next()
-                .map(|dt| dt.to_string())
-                .unwrap_or("no time".to_owned());
-            let link = entry
-                .links
-                .iter()
-                .next()
-                .map(|link| link.href.as_str())
-                .unwrap_or("no link");
-            let title = entry
-                .title
-                .as_ref()
-                .map(|title| title.content.clone())
-                .unwrap_or("unnamed".to_owned());
-            let author = entry
-                .authors
-                .iter()
-                .next()
-                .map(|author| author.name.as_str());
-            let channel = feed.url.as_str();
-            let component = renderer::ArticleComponent::new(
-                channel,
-                author,
-                title.as_str(),
-                link,
-                time.as_str(),
-                content.as_str(),
-            );
-            self.cached_detail.replace(Some(component.to_detail()));
+                .get();
+            let detail = article::Detail::from(article::Builder::from_article(
+                article.lock().as_ref().unwrap(),
+                self.article_id.get(),
+                feed,
+            ));
+            self.cached_detail.replace(Some(detail));
         }
         self.cached_detail.borrow().as_ref().unwrap().ui(ui);
     }
 }
 
 pub struct FeedFlowView {
-    id: FeedId,
+    id: EntryId,
     page: usize,
     per_page: usize,
-    cached_previews: RefCell<Option<Vec<renderer::Preview>>>,
+    cached_previews: RefCell<Option<Vec<article::Preview>>>,
 }
 
 impl<'a> FeedFlowView {
-    pub fn new(id: FeedId) -> Self {
+    pub fn new(id: EntryId) -> Self {
         Self {
             id,
             page: 1,
@@ -112,68 +71,33 @@ impl<'a> FeedFlowView {
 
 impl View for FeedFlowView {
     fn show(&self, app: &RSSucks, ui: &mut egui::Ui) {
-        if app.rss_client.feed_is_syncing(self.id) {
+        if app.rss_client.entry_is_syncing(self.id) {
             ui.spinner();
         }
 
-        let feed = app.rss_client.get_feed(&self.id).unwrap();
+        let articles = app
+            .rss_client
+            .get()
+            .borrow()
+            .try_get_all_article_ids_by_entry_id(&self.id.get());
 
-        match feed.model {
-            Some(model) => {
-                if let Some(title) = model.title {
-                    ui.heading(&title.content);
-                };
-                if let Some(updated) = model.updated {
-                    ui.label(format!("更新于 {}", updated));
-                };
-                if let Some(description) = model.description {
-                    ui.heading(&description.content);
-                };
-                ui.separator();
-
+        match articles {
+            Ok(articles) => {
                 if self.cached_previews.borrow().is_none() {
-                    let previews = model
-                        .entries
-                        .iter()
-                        .map(|entry| {
-                            let content = entry
-                                .summary
-                                .iter()
-                                .next()
-                                .map(|content| content.content.clone())
-                                .unwrap_or("no content".to_owned());
-                            let time = entry
-                                .updated
-                                .iter()
-                                .next()
-                                .map(|dt| dt.to_string())
-                                .unwrap_or("no time".to_owned());
-                            let link = entry
-                                .links
-                                .iter()
-                                .next()
-                                .map(|link| link.href.as_str())
-                                .unwrap_or("no link");
-                            let title = entry
-                                .title
-                                .as_ref()
-                                .map(|title| title.content.clone())
-                                .unwrap_or("unnamed".to_owned());
-                            let author = entry
-                                .authors
-                                .iter()
-                                .next()
-                                .map(|author| author.name.as_str());
-                            let channel = feed.url.as_str();
-                            let component = renderer::ArticleComponent::new(
-                                channel,
-                                author,
-                                title.as_str(),
-                                link,
-                                time.as_str(),
-                                content.as_str(),
+                    let previews = articles
+                        .into_iter()
+                        .map(ArticleId::from)
+                        .map(|article_id| {
+                            let feed = app.rss_client.get();
+                            let article =
+                                app.rss_client.get_article_by_id(&article_id).unwrap().get();
+                            let article = article.lock();
+                            let builder = article::Builder::from_article(
+                                article.as_ref().unwrap(),
+                                article_id.get(),
+                                feed,
                             );
-                            component.to_preview(self.id, entry.id.to_owned())
+                            article::Preview::from(builder)
                         })
                         .collect();
                     self.cached_previews.replace(Some(previews));
@@ -183,20 +107,19 @@ impl View for FeedFlowView {
                     for preview in self.cached_previews.borrow().as_ref().unwrap() {
                         ui.add(preview);
                         if ui.button("阅读全文").clicked() {
-                            app.set_view(ReaderView::new(
-                                preview.entry_id.to_owned(),
-                                preview.feed_id,
-                            ));
+                            app.set_view(ReaderView::new(ArticleId::from(
+                                preview.article_id.clone(),
+                            )));
                         }
                     }
                 });
 
                 ui.label("第一页（暂时还没写翻页的操作");
             }
-            None => {
+            Err(_) => {
                 ui.label("该订阅尚未同步，现在同步吗？");
                 if ui.button("同步").clicked() {
-                    app.rss_client.try_start_sync_feed(self.id);
+                    app.rss_client.try_start_sync_entry(self.id);
                 }
             }
         };
@@ -274,7 +197,14 @@ impl Window for NewFeedWindow {
                     match url::Url::parse(&self.feed_url) {
                         Ok(url) => {
                             if ui.button("✔").on_hover_text("确定").clicked() {
-                                self.client.create_feed_with_folder(url, self.folder_id);
+                                match self.folder_id {
+                                    Some(folder_id) => {
+                                        self.client.create_entry_with_folder(url, folder_id);
+                                    }
+                                    None => {
+                                        self.client.create_entry(url);
+                                    }
+                                }
                                 self.is_open = false;
                             }
                         }
@@ -374,7 +304,7 @@ impl<'app> LeftSidePanel<'app> {
                 ui.add(CollapsingFolder::new(&self.app, folder_id));
             }
 
-            for feed_id in self.app.rss_client.list_orphan_feed() {
+            for feed_id in self.app.rss_client.list_orphan_entry() {
                 ui.add(widget::FeedMinimal::new(&self.app, feed_id));
             }
         });

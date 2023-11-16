@@ -1,7 +1,13 @@
 mod detail;
 mod preview;
 
+use std::cell::Ref;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::article::Article;
+use crate::article::ArticleUuid;
+use crate::feed::Feed;
 use ego_tree::iter::Edge;
 use egui::RichText;
 use lazy_static::lazy_static;
@@ -95,7 +101,7 @@ fn stylize_text(element: &Element, text: String) -> RichText {
 
 // A builder helps you to get article details and previews.
 pub struct Builder<'a> {
-    entry_title: Option<&'a str>,
+    entry_title: Option<String>,
     title: &'a str,
     link: Option<&'a str>,
     updated: Option<&'a str>,
@@ -106,18 +112,27 @@ pub struct Builder<'a> {
     break_anywhere: bool,
     overflow_character: Option<char>,
     fulltext: Option<String>,
-    entry_id: &'a str,
-    feed_id: &'a str,
+    article_id: ArticleUuid,
 }
 
 impl<'a> Builder<'a> {
-    pub fn from_article(article: &Article, entry_title: Option<&str>, feed_id: &str) -> Self {
-        let updated = article.updated.map(|s| s.as_str());
-        let published = article.published.map(|s| s.as_str());
+    pub fn from_article(
+        article: &'a Article,
+        article_id: ArticleUuid,
+        feed: Rc<RefCell<Feed>>,
+    ) -> Self {
+        let updated = article.updated.as_ref().map(|s| s.as_str());
+        let published = article.published.as_ref().map(|s| s.as_str());
         let title = &article.title;
         let link = article.links.get(0).map(|link| link.as_str());
         let summary = article.summary.as_ref();
-        let catrgories = article.categories;
+        let catrgories = &article.categories;
+        let entry_title = article.belong_to.and_then(|entry_uuid| {
+            feed.borrow()
+                .try_get_entry_by_id(&entry_uuid)
+                .ok()
+                .map(|entry_rc| entry_rc.borrow().title().to_owned())
+        });
         let unread = article.unread;
 
         let (elements, fulltext) = if let Some(summary) = summary {
@@ -156,7 +171,7 @@ impl<'a> Builder<'a> {
                         }
                         scraper::Node::Element(tag) => {
                             dom_stack.push(tag.name().to_owned());
-                            let mut element = element_stack.last().unwrap().clone();
+                            let mut element = element_stack.last().cloned().unwrap();
                             match tag.name() {
                                 "p" => element.typ = ElementType::Paragraph,
                                 "b" => element.bold = true,
@@ -184,17 +199,19 @@ impl<'a> Builder<'a> {
                                         tag.attr("width").and_then(|s| s.parse::<f32>().ok()),
                                         tag.attr("height").and_then(|s| s.parse::<f32>().ok()),
                                     );
-                                    elements.push(element)
+                                    elements.push(element.clone())
                                 }
                                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
                                     element.typ = ElementType::Heading;
                                     element.heading_level = tag.name()[1..].parse().ok();
                                 }
+                                _ => {}
                             }
                             // block display tags
                             match tag.name() {
                                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "ul" | "p"
                                 | "hr" | "pre" => element.newline = true,
+                                _ => {}
                             }
                             element_stack.push(element);
                         }
@@ -223,12 +240,11 @@ impl<'a> Builder<'a> {
             break_anywhere: true,
             overflow_character: Some('…'),
             fulltext,
-            entry_id: &article.id,
-            feed_id,
+            article_id,
         }
     }
 
-    fn to_preview(&self) -> Preview<'a> {
+    fn to_preview(self) -> Preview {
         Preview::from(self)
     }
 }

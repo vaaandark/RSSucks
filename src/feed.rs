@@ -254,7 +254,7 @@ type ArticlesMap = Arc<Mutex<BTreeMap<ArticleUuid, Arc<Mutex<Article>>>>>;
 /// which contains orphan entries directly and folders with entries inside.
 /// Feed can be converted from [`opml::Opml`].
 #[allow(unused)]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct Feed {
     /// OPML version.
     pub version: String,

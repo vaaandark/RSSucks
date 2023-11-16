@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    utils::rss_client::RssClient,
+    utils::rss_client_ng::RssClient,
     view::{self, View},
 };
 

@@ -2,24 +2,24 @@ use egui::{Image, Margin, RichText, Rounding, Widget};
 
 use super::{Builder, Element, ElementType};
 
-pub struct Detail<'a> {
+pub struct Detail {
     entry_title: Option<String>,
     title: String,
     link: Option<String>,
     updated: Option<String>,
     published: Option<String>,
-    elements: &'a Option<Vec<Element>>,
+    elements: Option<Vec<Element>>,
 }
 
-impl<'a> From<&Builder<'a>> for Detail<'a> {
-    fn from(value: &Builder<'a>) -> Self {
+impl<'a> From<Builder<'a>> for Detail {
+    fn from(value: Builder<'a>) -> Self {
         Detail {
             entry_title: value.entry_title.map(|s| s.to_owned()),
             title: value.title.to_owned(),
-            link: value.link.to_owned().map(|s| s.to_owned()),
+            link: value.link.map(|s| s.to_owned()),
             updated: value.updated.map(|s| s.to_owned()),
             published: value.published.map(|s| s.to_owned()),
-            elements: &value.elements,
+            elements: value.elements,
         }
     }
 }
@@ -43,7 +43,7 @@ impl<'a> From<&Builder<'a>> for Detail<'a> {
 //     richtext
 // }
 
-impl<'a> Widget for &Detail<'a> {
+impl<'a> Widget for &Detail {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()
@@ -71,16 +71,16 @@ impl<'a> Widget for &Detail<'a> {
                             const HEADER_SMALL_TEXT_SIZE: f32 = 12.0;
 
                             // title
-                            if let Some(link) = self.link {
+                            if let Some(link) = &self.link {
                                 ui.hyperlink_to(
-                                    RichText::new(self.title)
+                                    RichText::new(&self.title)
                                         .size(HEADER_LARGE_TEXT_SIZE)
                                         .strong(),
                                     link,
                                 );
                             } else {
                                 ui.label(
-                                    RichText::new(self.title)
+                                    RichText::new(&self.title)
                                         .size(HEADER_LARGE_TEXT_SIZE)
                                         .strong(),
                                 );
@@ -92,18 +92,18 @@ impl<'a> Widget for &Detail<'a> {
                                 // entry_title: Option<String>,
                                 // updated: Option<String>,
                                 // published: Option<String>,
-                                if let Some(entry_title) = self.entry_title {
+                                if let Some(entry_title) = &self.entry_title {
                                     ui.label(
                                         RichText::new(entry_title).size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                 }
-                                if let Some(published) = self.published {
+                                if let Some(published) = &self.published {
                                     ui.label(
                                         RichText::new("\tpublished: ").size(HEADER_SMALL_TEXT_SIZE),
                                     );
                                     ui.label(RichText::new(published).size(HEADER_SMALL_TEXT_SIZE));
                                 }
-                                if let Some(updated) = self.updated {
+                                if let Some(updated) = &self.updated {
                                     ui.label(
                                         RichText::new("\tupdated: ").size(HEADER_SMALL_TEXT_SIZE),
                                     );
@@ -119,7 +119,7 @@ impl<'a> Widget for &Detail<'a> {
                             .outer_margin(Margin::symmetric(16.0, 4.0))
                             .show(ui, |ui| {
                                 egui::ScrollArea::vertical().show(ui, |ui| {
-                                    if let Some(elements) = self.elements {
+                                    if let Some(elements) = &self.elements {
                                         let elements_len = elements.len();
                                         let mut idx: usize = 0;
                                         while idx < elements_len {
@@ -127,18 +127,23 @@ impl<'a> Widget for &Detail<'a> {
                                                 while let Some(element) = elements.get(idx) {
                                                     match element.typ {
                                                         ElementType::Paragraph => {
-                                                            if let Some(richtext) = element.text {
+                                                            if let Some(richtext) = &element.text {
                                                                 if let Some(dest) =
-                                                                    element.destination
+                                                                    &element.destination
                                                                 {
-                                                                    ui.hyperlink_to(richtext, dest);
+                                                                    ui.hyperlink_to(
+                                                                        richtext.to_owned(),
+                                                                        dest,
+                                                                    );
                                                                 } else {
-                                                                    ui.label(richtext);
+                                                                    ui.label(richtext.to_owned());
                                                                 }
                                                             }
                                                         }
                                                         ElementType::Heading => {
-                                                            if let Some(heading) = element.text {
+                                                            if let Some(heading) =
+                                                                element.text.to_owned()
+                                                            {
                                                                 ui.label(
                                                                     match element.heading_level {
                                                                         Some(level) => {
@@ -194,7 +199,7 @@ impl<'a> Widget for &Detail<'a> {
                                                     if element.typ != ElementType::Image {
                                                         break;
                                                     }
-                                                    if let Some(src) = element.image_tuple.0 {
+                                                    if let Some(src) = &element.image_tuple.0 {
                                                         ui.add_space(4.0);
                                                         ui.add(
                                                             Image::from(src)
