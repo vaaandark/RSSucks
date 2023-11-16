@@ -1,11 +1,13 @@
 use egui::{Image, Margin, RichText, Rounding, Widget};
 use uuid::Uuid;
 
+use crate::{article::ArticleUuid, feed::EntryUuid};
+
 use super::{Builder, Element, ElementType};
 
-pub struct Preview<'a> {
+pub struct Preview {
     // rendering previews needs ownership
-    elements: &'a Option<Vec<Element>>,
+    elements: Option<Vec<Element>>,
     scroll_area_id: Uuid,
     max_rows: usize,
     break_anywhere: bool,
@@ -13,12 +15,13 @@ pub struct Preview<'a> {
     fulltext: Option<String>,
     max_images_num: usize,
     title: String,
+    pub article_id: ArticleUuid,
 }
 
-impl<'a> From<&Builder<'a>> for Preview<'a> {
-    fn from(value: &Builder<'a>) -> Self {
+impl<'a> From<Builder<'a>> for Preview {
+    fn from(value: Builder<'a>) -> Self {
         Preview {
-            elements: &value.elements,
+            elements: value.elements,
             scroll_area_id: Uuid::new_v4(),
             max_rows: value.max_rows,
             break_anywhere: value.break_anywhere,
@@ -26,11 +29,12 @@ impl<'a> From<&Builder<'a>> for Preview<'a> {
             fulltext: value.fulltext.clone(),
             max_images_num: 3,
             title: value.title.to_owned(),
+            article_id: value.article_id,
         }
     }
 }
 
-impl<'a> Widget for &Preview<'a> {
+impl<'a> Widget for &Preview {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()
@@ -50,12 +54,14 @@ impl<'a> Widget for &Preview<'a> {
                     ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
                     ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                     // Render title:
-                    ui.label(RichText::new(self.title).size(20.0).strong());
+                    ui.label(RichText::new(&self.title).size(20.0).strong());
 
                     // Render content:
                     // First, render text.
                     let mut job = egui::text::LayoutJob::single_section(
-                        self.fulltext.map_or("No content...".to_owned(), |text| text),
+                        self.fulltext
+                            .clone()
+                            .map_or("No content...".to_owned(), |text| text),
                         egui::TextFormat::default(),
                     );
                     job.wrap = egui::text::TextWrapping {
@@ -67,7 +73,7 @@ impl<'a> Widget for &Preview<'a> {
                     ui.label(job);
 
                     // Then render images.
-                    if let Some(elements) = self.elements {
+                    if let Some(elements) = &self.elements {
                         let mut images_iter = elements
                             .iter()
                             .filter_map(|element| {
@@ -90,7 +96,8 @@ impl<'a> Widget for &Preview<'a> {
                                             ui.add(
                                                 Image::from(src)
                                                     .fit_to_exact_size(egui::Vec2::new(
-                                                        f32::INFINITY, 128.0,
+                                                        f32::INFINITY,
+                                                        128.0,
                                                     ))
                                                     .rounding(Rounding::ZERO.at_least(10.0))
                                                     .show_loading_spinner(true),

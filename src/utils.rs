@@ -292,7 +292,7 @@ pub mod rss_client_ng {
     use uuid::Uuid;
 
     use crate::{
-        article::ArticleUuid,
+        article::{self, ArticleUuid},
         feed::{self, EntryUuid, FolderUuid},
     };
 
@@ -318,32 +318,42 @@ pub mod rss_client_ng {
     }
 
     #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
-    pub struct FeedId(EntryUuid);
+    pub struct EntryId(EntryUuid);
 
-    impl From<EntryUuid> for FeedId {
+    impl From<EntryUuid> for EntryId {
         fn from(value: EntryUuid) -> Self {
             Self(value)
         }
     }
 
-    impl From<Uuid> for FeedId {
+    impl From<Uuid> for EntryId {
         fn from(value: Uuid) -> Self {
             Self(EntryUuid::from(value))
         }
     }
 
-    impl FeedId {
+    impl EntryId {
+        pub fn get(&self) -> EntryUuid {
+            self.0
+        }
+
         pub fn new() -> Self {
             Self::from(Uuid::new_v4())
         }
     }
 
     #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-    pub struct EntryId(ArticleUuid);
+    pub struct ArticleId(ArticleUuid);
 
-    impl From<ArticleUuid> for EntryId {
+    impl From<ArticleUuid> for ArticleId {
         fn from(value: ArticleUuid) -> Self {
             Self(value)
+        }
+    }
+
+    impl ArticleId {
+        pub fn get(&self) -> ArticleUuid {
+            self.0.clone()
         }
     }
 
@@ -353,23 +363,31 @@ pub mod rss_client_ng {
     }
 
     impl Folder {
+        pub fn get(&self) -> Rc<RefCell<feed::Folder>> {
+            Rc::clone(&self.folder)
+        }
+
         pub fn name(&self) -> String {
             self.folder.borrow().title().to_owned()
         }
     }
 
     #[derive(Serialize, Deserialize)]
-    pub struct Feed {
+    pub struct Entry {
         entry: Rc<RefCell<feed::Entry>>,
     }
 
-    impl From<Rc<RefCell<feed::Entry>>> for Feed {
+    impl From<Rc<RefCell<feed::Entry>>> for Entry {
         fn from(entry: Rc<RefCell<feed::Entry>>) -> Self {
             Self { entry }
         }
     }
 
-    impl Feed {
+    impl Entry {
+        pub fn get(&self) -> Rc<RefCell<feed::Entry>> {
+            Rc::clone(&self.entry)
+        }
+
         pub fn new_with_url(url: url::Url) -> Self {
             Self::from(Rc::new(RefCell::new(feed::Entry::new(
                 "unnamed".to_owned(),
@@ -382,10 +400,22 @@ pub mod rss_client_ng {
         }
     }
 
-    pub struct Entry {
-        pub id: EntryId,
-        pub feed_id: FeedId,
-        pub model: feed_rs::model::Entry,
+    pub struct Article {
+        article: Arc<Mutex<article::Article>>,
+    }
+
+    impl Article {
+        pub fn get(&self) -> Arc<Mutex<article::Article>> {
+            Arc::clone(&self.article)
+        }
+    }
+
+    impl From<Arc<Mutex<article::Article>>> for Article {
+        fn from(value: Arc<Mutex<article::Article>>) -> Self {
+            Self {
+                article: Arc::clone(&value),
+            }
+        }
     }
 
     #[derive(Default, Serialize, Deserialize, Clone)]
@@ -394,6 +424,10 @@ pub mod rss_client_ng {
     }
 
     impl RssClient {
+        pub fn get(&self) -> Rc<RefCell<feed::Feed>> {
+            Rc::clone(&self.feed)
+        }
+
         pub fn create_folder(&self, name: impl ToString) -> FolderId {
             let result = self
                 .feed
@@ -433,14 +467,14 @@ pub mod rss_client_ng {
                 .collect()
         }
 
-        pub fn create_feed(&self, url: url::Url) -> FeedId {
+        pub fn create_entry(&self, url: url::Url) -> EntryId {
             let entry = feed::Entry::new("unnamed".to_owned(), url);
-            FeedId::from(self.feed.borrow_mut().add_orphan_entry(entry))
+            EntryId::from(self.feed.borrow_mut().add_orphan_entry(entry))
         }
 
-        pub fn create_feed_with_folder(&self, url: url::Url, folder_id: FolderId) -> FeedId {
+        pub fn create_entry_with_folder(&self, url: url::Url, folder_id: FolderId) -> EntryId {
             let entry = feed::Entry::new("unnamed".to_owned(), url);
-            FeedId::from(
+            EntryId::from(
                 self.feed
                     .borrow_mut()
                     .try_add_entry_to_folder(entry, &folder_id.0)
@@ -448,63 +482,71 @@ pub mod rss_client_ng {
             )
         }
 
-        pub fn get_feed(&self, id: &FeedId) -> Option<Feed> {
+        pub fn get_entry(&self, id: &EntryId) -> Option<Entry> {
             self.feed
                 .borrow()
                 .try_get_entry_by_id(&id.0)
                 .ok()
-                .map(Feed::from)
+                .map(Entry::from)
         }
 
-        pub fn delete_feed(&self, id: FeedId) -> Option<Feed> {
+        pub fn delete_entry(&self, id: EntryId) -> Option<Entry> {
             self.feed
                 .borrow_mut()
                 .try_remove_entry_by_id(&id.0)
                 .ok()
-                .map(Feed::from)
+                .map(Entry::from)
         }
 
-        pub fn list_feed(&self) -> Vec<FeedId> {
+        pub fn list_entry(&self) -> Vec<EntryId> {
             self.feed
                 .borrow()
                 .get_all_entry_ids()
                 .into_iter()
-                .map(FeedId::from)
+                .map(EntryId::from)
                 .collect()
         }
 
-        pub fn list_orphan_feed(&self) -> Vec<FeedId> {
+        pub fn list_orphan_entry(&self) -> Vec<EntryId> {
             self.feed
                 .borrow()
                 .get_all_orphan_entry_ids()
                 .into_iter()
-                .map(FeedId::from)
+                .map(EntryId::from)
                 .collect()
         }
 
-        pub fn list_feed_by_folder(&self, folder_id: FolderId) -> Vec<FeedId> {
+        pub fn list_entry_by_folder(&self, folder_id: FolderId) -> Vec<EntryId> {
             self.feed
                 .borrow()
                 .try_get_entry_ids_by_folder_id(&folder_id.0)
                 .unwrap()
                 .into_iter()
-                .map(FeedId::from)
+                .map(EntryId::from)
                 .collect()
         }
 
+        pub fn get_article_by_id(&self, article_id: &ArticleId) -> Option<Article> {
+            self.feed
+                .borrow()
+                .try_get_article_by_id(&article_id.0)
+                .map(Article::from)
+                .ok()
+        }
+
         pub fn try_start_sync_folder(&self, id: FolderId) -> Result<()> {
-            for feed_id in self.list_feed_by_folder(id) {
-                self.try_start_sync_feed(feed_id)?;
+            for feed_id in self.list_entry_by_folder(id) {
+                self.try_start_sync_entry(feed_id)?;
             }
 
             Ok(())
         }
 
-        pub fn try_start_sync_feed(&self, id: FeedId) -> Result<bool> {
+        pub fn try_start_sync_entry(&self, id: EntryId) -> Result<bool> {
             self.feed.borrow_mut().try_sync_entry_by_id(&id.0)
         }
 
-        pub fn feed_is_syncing(&self, id: FeedId) -> bool {
+        pub fn entry_is_syncing(&self, id: EntryId) -> bool {
             self.feed.borrow().is_entry_synchronizing(&id.0).unwrap()
         }
     }

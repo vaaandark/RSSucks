@@ -1,17 +1,17 @@
 use egui::{Response, Ui, Widget};
 
 use crate::{
-    utils::rss_client_ng::{FeedId, FolderId},
+    utils::rss_client_ng::{EntryId, FolderId},
     view, RSSucks,
 };
 
 pub struct FeedMinimal<'a> {
     app: &'a RSSucks,
-    id: FeedId,
+    id: EntryId,
 }
 
 impl<'a> FeedMinimal<'a> {
-    pub fn new(app: &'a RSSucks, id: FeedId) -> Self {
+    pub fn new(app: &'a RSSucks, id: EntryId) -> Self {
         Self { app, id }
     }
 }
@@ -19,7 +19,7 @@ impl<'a> FeedMinimal<'a> {
 impl<'a> Widget for FeedMinimal<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.allocate_ui(ui.available_size(), |ui| {
-            let feed = self.app.rss_client.get_feed(&self.id).unwrap();
+            let feed = self.app.rss_client.get_entry(&self.id).unwrap();
             ui.horizontal(|ui| {
                 let feed_button = ui.button(feed.get_name());
 
@@ -29,16 +29,16 @@ impl<'a> Widget for FeedMinimal<'a> {
 
                 if feed_button.double_clicked() {}
 
-                if self.app.rss_client.feed_is_syncing(self.id) {
+                if self.app.rss_client.entry_is_syncing(self.id) {
                     ui.spinner();
                 }
 
                 if ui.button("🔁").on_hover_text("拉取文章").clicked() {
-                    self.app.rss_client.try_start_sync_feed(self.id).unwrap();
+                    self.app.rss_client.try_start_sync_entry(self.id).unwrap();
                 }
 
                 if ui.button("🗙").on_hover_text("删除订阅").clicked() {
-                    self.app.rss_client.delete_feed(self.id);
+                    self.app.rss_client.delete_entry(self.id);
                 }
             });
         })
@@ -47,15 +47,15 @@ impl<'a> Widget for FeedMinimal<'a> {
 }
 
 pub struct FeedPreview {
-    id: FeedId,
+    id: EntryId,
 }
 
 pub struct FeedFlow {
-    id: FeedId,
+    id: EntryId,
 }
 
 pub struct FeedConfig {
-    id: FeedId,
+    id: EntryId,
 }
 
 pub struct CollapsingFolder<'app> {
@@ -91,7 +91,7 @@ impl<'app> Widget for CollapsingFolder<'app> {
                     self.app.rss_client.delete_folder(self.folder_id);
                 }
             });
-            for feed_id in self.app.rss_client.list_feed_by_folder(self.folder_id) {
+            for feed_id in self.app.rss_client.list_entry_by_folder(self.folder_id) {
                 ui.add(FeedMinimal::new(self.app, feed_id));
             }
         });
