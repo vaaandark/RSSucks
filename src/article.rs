@@ -3,12 +3,38 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Universally Unique Identifier for [`Article`].
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ArticleUuid {
     updated: Option<DateTime<Utc>>,
     published: Option<DateTime<Utc>>,
     feed_id: EntryUuid,
     id: String,
+}
+
+impl PartialOrd for ArticleUuid {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ArticleUuid {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let get_time_fn = |uuid: &ArticleUuid| {
+            if uuid.updated.is_some() {
+                uuid.updated
+            } else if uuid.published.is_some() {
+                uuid.published
+            } else {
+                None
+            }
+        };
+        match (get_time_fn(self), get_time_fn(other)) {
+            (Some(self_time), Some(other_time)) => other_time.cmp(&self_time),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => self.id.cmp(&other.id),
+        }
+    }
 }
 
 impl ArticleUuid {
