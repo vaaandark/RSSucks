@@ -14,9 +14,9 @@ pub struct ArticleUuid {
 impl Ord for ArticleUuid {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let get_time_fn = |uuid: &ArticleUuid| {
-            if let Some(_) = uuid.updated {
+            if uuid.updated.is_some() {
                 uuid.updated
-            } else if let Some(_) = uuid.published {
+            } else if uuid.published.is_some() {
                 uuid.published
             } else {
                 None
