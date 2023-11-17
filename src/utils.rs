@@ -288,7 +288,7 @@ pub mod rss_client_ng {
 
     use uuid::Uuid;
 
-    use crate::{
+    use crate::subscription::{
         article::{self, ArticleUuid},
         feed::{self, EntryUuid, FolderUuid},
     };

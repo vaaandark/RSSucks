@@ -3,7 +3,7 @@ mod preview;
 
 use std::rc::Rc;
 
-use crate::article::Article;
+use crate::subscription::article::Article;
 use crate::utils::rss_client_ng::ArticleId;
 use crate::view::View;
 use crate::RSSucks;

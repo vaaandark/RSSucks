@@ -220,7 +220,7 @@ impl Opml {
 
 #[cfg(test)]
 mod test {
-    use crate::opml::Opml;
+    use crate::subscription::opml::Opml;
     use std::fs::read_to_string;
 
     #[test]

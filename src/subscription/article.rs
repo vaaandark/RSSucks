@@ -1,4 +1,4 @@
-use crate::feed::EntryUuid;
+use super::feed::EntryUuid;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
