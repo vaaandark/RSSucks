@@ -191,7 +191,7 @@ impl Widget for &Detail {
                                                             // unsupported
                                                         }
                                                         _ => {
-                                                        // ElementType::Paragraph | ElementType::CodeBlock => {
+                                                            // ElementType::Paragraph | ElementType::CodeBlock => {
                                                             if let Some(richtext) = &element.text {
                                                                 if let Some(dest) =
                                                                     &element.destination
