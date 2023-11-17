@@ -44,7 +44,7 @@ impl View for ReaderView {
                 .get();
             let detail = article::Detail::from(article::Builder::from_article(
                 article.lock().as_ref().unwrap(),
-                self.article_id.get(),
+                self.article_id.clone(),
                 self.parent_view.as_ref().map(Rc::clone),
                 Rc::clone(&app),
             ));
@@ -101,7 +101,7 @@ impl View for FeedFlowView {
                             let article = article.lock();
                             let builder = article::Builder::from_article(
                                 article.as_ref().unwrap(),
-                                article_id.get(),
+                                article_id,
                                 Some(Rc::clone(&current_view)),
                                 Rc::clone(&app),
                             );
