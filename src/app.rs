@@ -75,7 +75,7 @@ impl RSSucks {
             .push(Box::new(window));
     }
 
-    pub fn import_feed(&mut self, feed: crate::feed::Feed) {
+    pub fn import_feed(&mut self, feed: crate::subscription::feed::Feed) {
         self.rss_client = RssClient::new(feed);
     }
 }

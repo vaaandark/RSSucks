@@ -1,6 +1,6 @@
 //! Data structures and operating interfaces for Rss feeds.
-use crate::article::{Article, ArticleUuid};
-use crate::opml;
+use super::article::{Article, ArticleUuid};
+use super::opml;
 use anyhow::{anyhow, Context, Error, Ok, Result};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
@@ -648,9 +648,9 @@ impl Feed {
 
 #[cfg(test)]
 mod test {
-    use crate::feed::Entry;
-    use crate::feed::Feed;
-    use crate::opml::Opml;
+    use crate::subscription::feed::Entry;
+    use crate::subscription::feed::Feed;
+    use crate::subscription::opml::Opml;
     use std::fs::read_to_string;
     use url::Url;
 

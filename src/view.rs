@@ -7,8 +7,8 @@ use uuid::Uuid;
 use crate::utils::rss_client_ng::ArticleId;
 use crate::widgets::article;
 use crate::{
-    feed::Feed,
-    opml::Opml,
+    subscription::feed::Feed,
+    subscription::opml::Opml,
     utils::rss_client_ng::{EntryId, FolderId, RssClient},
     widget::{self, CollapsingFolder},
     RSSucks,
