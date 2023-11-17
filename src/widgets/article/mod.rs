@@ -210,20 +210,23 @@ impl<'a> Builder<'a> {
                                 }
                                 _ => {}
                             }
-                            // block display tags
-                            match tag.name() {
-                                "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "ul" | "p"
-                                | "hr" | "pre" => element.newline = true,
-                                _ => {}
-                            }
                             element_stack.push(element);
                         }
                         _ => {}
                     },
 
                     Edge::Close(node) => {
-                        if let scraper::Node::Element(_) = node.value() {
+                        if let scraper::Node::Element(tag) = node.value() {
                             element_stack.pop();
+                            // block display tags
+                            match tag.name() {
+                                "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "ul" | "p"
+                                | "hr" | "pre" => elements.push(Element {
+                                    typ: ElementType::LineBreak,
+                                    ..Default::default()
+                                }),
+                                _ => {}
+                            }
                         }
                     }
                 }

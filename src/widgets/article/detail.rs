@@ -128,22 +128,22 @@ impl Widget for &Detail {
                                         while idx < elements_len {
                                             ui.horizontal_wrapped(|ui| {
                                                 while let Some(element) = elements.get(idx) {
-                                                    // println!("{:?}", element.typ);
                                                     match element.typ {
-                                                        ElementType::Paragraph => {
-                                                            if let Some(richtext) = &element.text {
-                                                                if let Some(dest) =
-                                                                    &element.destination
-                                                                {
-                                                                    ui.hyperlink_to(
-                                                                        richtext.to_owned(),
-                                                                        dest,
-                                                                    );
-                                                                } else {
-                                                                    ui.label(richtext.to_owned());
-                                                                }
-                                                            }
-                                                        }
+                                                        // ElementType::Paragraph | Element::CodeBlock => {
+                                                        //     if let Some(richtext) = &element.text {
+                                                        //         println!("{:?}", richtext.text());
+                                                        //         if let Some(dest) =
+                                                        //             &element.destination
+                                                        //         {
+                                                        //             ui.hyperlink_to(
+                                                        //                 richtext.to_owned(),
+                                                        //                 dest,
+                                                        //             );
+                                                        //         } else {
+                                                        //             ui.label(richtext.to_owned());
+                                                        //         }
+                                                        //     }
+                                                        // }
                                                         ElementType::Heading => {
                                                             if let Some(heading) =
                                                                 element.text.to_owned()
@@ -172,23 +172,38 @@ impl Widget for &Detail {
                                                                 );
                                                             }
                                                         }
-                                                        ElementType::CodeBlock => {
-                                                            // TODO
-                                                        }
-                                                        ElementType::ListItem => {
-                                                            // TODO
-                                                        }
+                                                        // ElementType::CodeBlock => {
+                                                        //     // TODO
+                                                        // }
+                                                        // ElementType::ListItem => {
+                                                        //     // TODO
+                                                        // }
                                                         ElementType::LineBreak => {
                                                             ui.end_row();
                                                         }
                                                         ElementType::Separator => {
                                                             ui.separator();
                                                         }
+                                                        ElementType::Image => {
+                                                            break;
+                                                        }
                                                         ElementType::Others => {
                                                             // unsupported
                                                         }
-                                                        ElementType::Image => {
-                                                            break;
+                                                        _ => {
+                                                            // ElementType::Paragraph | ElementType::CodeBlock => {
+                                                            if let Some(richtext) = &element.text {
+                                                                if let Some(dest) =
+                                                                    &element.destination
+                                                                {
+                                                                    ui.hyperlink_to(
+                                                                        richtext.to_owned(),
+                                                                        dest,
+                                                                    );
+                                                                } else {
+                                                                    ui.label(richtext.to_owned());
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                     if element.newline {
