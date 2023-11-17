@@ -306,38 +306,46 @@ impl<'app> LeftSidePanel<'app> {
 
             ui.separator();
 
-            ui.label("订阅列表");
-
-            let app = self.app as *const RSSucks as *mut RSSucks;
-            if ui.button("导入配置").clicked() {
-                async_std::task::block_on(async move {
-                    if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
-                        let data = file.read().await;
-                        if let Ok(opml) = Opml::try_from_str(&String::from_utf8_lossy(&data)) {
-                            if let Ok(feed) = Feed::try_from(opml) {
-                                unsafe {
-                                    (*app).import_feed(feed);
+            ui.horizontal(|ui| {
+                ui.label("订阅列表");
+                let app = self.app as *const RSSucks as *mut RSSucks;
+                if ui.button("📥").on_hover_text("导入配置").clicked() {
+                    async_std::task::block_on(async move {
+                        if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
+                            let data = file.read().await;
+                            if let Ok(opml) = Opml::try_from_str(&String::from_utf8_lossy(&data)) {
+                                if let Ok(feed) = Feed::try_from(opml) {
+                                    unsafe {
+                                        (*app).import_feed(feed);
+                                    }
                                 }
                             }
                         }
-                    }
-                });
-            }
+                    });
+                }
+                if ui.button("🔁").on_hover_text("拉取全部").clicked() {
+                    let _ = self.app.rss_client.try_start_sync_all();
+                }
+            });
 
             ui.separator();
 
-            if ui.button("新建文件夹").clicked() {
-                self.app
-                    .add_window(NewFolderWindow::new(self.app.rss_client.clone()));
-            }
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                if ui.button("新建文件夹").clicked() {
+                    self.app
+                        .add_window(NewFolderWindow::new(self.app.rss_client.clone()));
+                }
 
-            for folder_id in self.app.rss_client.list_folder() {
-                ui.add(CollapsingFolder::new(self.app, folder_id));
-            }
+                ui.separator();
 
-            for feed_id in self.app.rss_client.list_orphan_entry() {
-                ui.add(widget::FeedMinimal::new(self.app, feed_id));
-            }
+                for folder_id in self.app.rss_client.list_folder() {
+                    ui.add(CollapsingFolder::new(self.app, folder_id));
+                }
+
+                for feed_id in self.app.rss_client.list_orphan_entry() {
+                    ui.add(widget::FeedMinimal::new(self.app, feed_id));
+                }
+            });
         });
     }
 }
