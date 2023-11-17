@@ -72,7 +72,6 @@ impl Widget for &Preview {
                             {
                                 ui.ctx().style().visuals.strong_text_color()
                             } else {
-                                if ui.ctx().style().visuals.dark_mode {}
                                 ui.ctx().style().visuals.weak_text_color()
                             },
                         ),

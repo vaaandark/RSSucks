@@ -115,7 +115,7 @@ impl View for FeedFlowView {
                     for preview in self.cached_previews.borrow().as_ref().unwrap() {
                         if ui.add(preview).clicked() {
                             app.set_view(Rc::new(Box::new(ReaderView::new(
-                                ArticleId::from(preview.article_id.clone()),
+                                preview.article_id.clone(),
                                 Some(Rc::clone(&current_view)),
                             ))));
                         }
