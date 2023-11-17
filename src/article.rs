@@ -19,20 +19,14 @@ impl PartialOrd for ArticleUuid {
 
 impl Ord for ArticleUuid {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let get_time_fn = |uuid: &ArticleUuid| {
-            if uuid.updated.is_some() {
-                uuid.updated
-            } else if uuid.published.is_some() {
-                uuid.published
-            } else {
-                None
-            }
-        };
-        match (get_time_fn(self), get_time_fn(other)) {
-            (Some(self_time), Some(other_time)) => other_time.cmp(&self_time),
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => self.id.cmp(&other.id),
+        match other.updated.cmp(&self.updated) {
+            std::cmp::Ordering::Equal => match other.published.cmp(&self.published) {
+                std::cmp::Ordering::Equal => self.id.cmp(&other.id),
+                std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+                std::cmp::Ordering::Less => std::cmp::Ordering::Less,
+            },
+            std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+            std::cmp::Ordering::Less => std::cmp::Ordering::Less,
         }
     }
 }
