@@ -4,7 +4,7 @@ mod preview;
 use std::rc::Rc;
 
 use crate::article::Article;
-use crate::article::ArticleUuid;
+use crate::utils::rss_client_ng::ArticleId;
 use crate::view::View;
 use crate::RSSucks;
 use ego_tree::iter::Edge;
@@ -107,7 +107,7 @@ pub struct Builder<'a> {
     break_anywhere: bool,
     overflow_character: Option<char>,
     fulltext: Option<String>,
-    article_id: ArticleUuid,
+    article_id: ArticleId,
     parent_view: Option<Rc<Box<dyn View>>>,
     app: Rc<RSSucks>,
 }
@@ -115,7 +115,7 @@ pub struct Builder<'a> {
 impl<'a> Builder<'a> {
     pub fn from_article(
         article: &'a Article,
-        article_id: ArticleUuid,
+        article_id: ArticleId,
         parent_view: Option<Rc<Box<dyn View>>>,
         app: Rc<RSSucks>,
     ) -> Self {
@@ -132,7 +132,6 @@ impl<'a> Builder<'a> {
                 .ok()
                 .map(|entry_rc| entry_rc.borrow().title().to_owned())
         });
-        let _unread = article.unread;
 
         let (elements, fulltext) = if let Some(summary) = summary {
             let fragment = scraper::Html::parse_fragment(summary);

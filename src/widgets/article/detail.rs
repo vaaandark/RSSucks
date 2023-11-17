@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use egui::{Image, Margin, RichText, Rounding, Widget};
 
-use crate::{view::View, RSSucks};
+use crate::{utils::rss_client_ng::ArticleId, view::View, RSSucks};
 
 use super::{Builder, Element, ElementType};
 
@@ -15,6 +15,7 @@ pub struct Detail {
     elements: Option<Vec<Element>>,
     app: Rc<RSSucks>,
     parent_view: Option<Rc<Box<dyn View>>>,
+    article_id: ArticleId,
 }
 
 impl<'a> From<Builder<'a>> for Detail {
@@ -28,12 +29,18 @@ impl<'a> From<Builder<'a>> for Detail {
             elements: value.elements,
             app: value.app,
             parent_view: value.parent_view,
+            article_id: value.article_id,
         }
     }
 }
 
 impl Widget for &Detail {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        if let Some(article) = self.app.rss_client.get_article_by_id(&self.article_id) {
+            if let Ok(mut article) = article.get().lock() {
+                article.unread = false;
+            }
+        }
         ui.allocate_ui(ui.available_size(), |ui| {
             egui::Frame::none()
                 .inner_margin(Margin::same(16.0))

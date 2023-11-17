@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use egui::{Image, Margin, Rect, RichText, Rounding, Sense, Widget};
 use uuid::Uuid;
 
-use crate::article::ArticleUuid;
+use crate::{utils::rss_client_ng::ArticleId, RSSucks};
 
 use super::{Builder, Element, ElementType};
 
@@ -15,7 +17,8 @@ pub struct Preview {
     fulltext: Option<String>,
     max_images_num: usize,
     title: String,
-    pub article_id: ArticleUuid,
+    pub article_id: ArticleId,
+    app: Rc<RSSucks>,
 }
 
 impl<'a> From<Builder<'a>> for Preview {
@@ -30,6 +33,7 @@ impl<'a> From<Builder<'a>> for Preview {
             max_images_num: 3,
             title: value.title.to_owned(),
             article_id: value.article_id,
+            app: value.app,
         }
     }
 }
@@ -56,7 +60,22 @@ impl Widget for &Preview {
                     ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
                     ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                     // Render title:
-                    ui.label(RichText::new(&self.title).size(20.0).strong());
+                    ui.label(
+                        RichText::new(&self.title).size(20.0).strong().color(
+                            if self
+                                .app
+                                .rss_client
+                                .get_article_by_id(&self.article_id)
+                                .map_or(false, |article| {
+                                    article.get().lock().is_ok_and(|article| article.unread)
+                                })
+                            {
+                                ui.ctx().style().visuals.strong_text_color()
+                            } else {
+                                ui.ctx().style().visuals.weak_text_color()
+                            },
+                        ),
+                    );
 
                     // Render content:
                     // First, render text.
