@@ -30,7 +30,12 @@ impl<'a> Widget for FeedMinimal<'a> {
                         .set_view(Rc::new(Box::new(view::FeedFlowView::new(self.id))));
                 }
 
-                if self.app.rss_client.entry_is_syncing(self.id) {
+                if self
+                    .app
+                    .rss_client
+                    .entry_is_syncing(self.id)
+                    .unwrap_or(false)
+                {
                     ui.spinner();
                 }
 

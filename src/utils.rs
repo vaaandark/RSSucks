@@ -552,8 +552,8 @@ pub mod rss_client_ng {
             self.feed.borrow_mut().try_sync_entry_by_id(&id.0)
         }
 
-        pub fn entry_is_syncing(&self, id: EntryId) -> bool {
-            self.feed.borrow().is_entry_synchronizing(&id.0).unwrap()
+        pub fn entry_is_syncing(&self, id: EntryId) -> Option<bool> {
+            self.feed.borrow().is_entry_synchronizing(&id.0)
         }
     }
 }
