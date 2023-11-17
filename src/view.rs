@@ -311,12 +311,13 @@ impl<'app> LeftSidePanel<'app> {
             let app = self.app as *const RSSucks as *mut RSSucks;
             if ui.button("导入配置").clicked() {
                 async_std::task::block_on(async move {
-                    let file = rfd::AsyncFileDialog::new().pick_file().await;
-                    let data = file.unwrap().read().await;
-                    if let Ok(opml) = Opml::try_from_str(&String::from_utf8_lossy(&data)) {
-                        if let Ok(feed) = Feed::try_from(opml) {
-                            unsafe {
-                                (*app).import_feed(feed);
+                    if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
+                        let data = file.read().await;
+                        if let Ok(opml) = Opml::try_from_str(&String::from_utf8_lossy(&data)) {
+                            if let Ok(feed) = Feed::try_from(opml) {
+                                unsafe {
+                                    (*app).import_feed(feed);
+                                }
                             }
                         }
                     }
