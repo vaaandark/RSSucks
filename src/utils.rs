@@ -546,6 +546,10 @@ pub mod rss_client_ng {
                 .ok()
         }
 
+        pub fn try_start_sync_all(&self) -> Result<()> {
+            self.feed.borrow_mut().try_sync_all()
+        }
+
         pub fn try_start_sync_folder(&self, id: FolderId) -> Result<()> {
             for feed_id in self.try_list_entry_by_folder(id)? {
                 self.try_start_sync_entry(feed_id)?;
