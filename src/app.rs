@@ -74,6 +74,10 @@ impl RSSucks {
             .expect("rare error detected")
             .push(Box::new(window));
     }
+
+    pub fn import_feed(&mut self, feed: crate::feed::Feed) {
+        self.rss_client = RssClient::new(feed);
+    }
 }
 
 impl eframe::App for App {
