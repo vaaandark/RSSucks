@@ -13,19 +13,7 @@ pub struct ArticleUuid {
 
 impl PartialOrd for ArticleUuid {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match other.updated.partial_cmp(&self.updated) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match other.published.partial_cmp(&self.published) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.id.partial_cmp(&other.id) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.feed_id.partial_cmp(&other.feed_id)
+        Some(self.cmp(other))
     }
 }
 
