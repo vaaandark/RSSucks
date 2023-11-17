@@ -75,8 +75,12 @@ impl FeedFlowView {
 
 impl View for FeedFlowView {
     fn show(&self, app: Rc<RSSucks>, ui: &mut egui::Ui) {
-        if app.rss_client.entry_is_syncing(self.id) {
-            ui.spinner();
+        if let Some(is_syncing) = app.rss_client.entry_is_syncing(self.id) {
+            if is_syncing {
+                ui.spinner();
+            }
+        } else {
+            return;
         }
 
         let articles = app
