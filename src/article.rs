@@ -23,12 +23,10 @@ impl Ord for ArticleUuid {
             }
         };
         match (get_time_fn(self), get_time_fn(other)) {
-            (Some(self_time), Some(other_time)) => {
-                other_time.cmp(&self_time)
-            },
+            (Some(self_time), Some(other_time)) => other_time.cmp(&self_time),
             (Some(_), None) => std::cmp::Ordering::Less,
             (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => self.id.cmp(&other.id)
+            (None, None) => self.id.cmp(&other.id),
         }
     }
 }
