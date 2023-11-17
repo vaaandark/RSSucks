@@ -544,35 +544,39 @@ impl Feed {
         let url = entry.xml_url.to_string();
         let entry_uuid = entry.uuid;
         ehttp::fetch(ehttp::Request::get(url.as_str()), move |result| {
-            let feed = feed_rs::parser::parse_with_uri(
-                std::io::Cursor::new(result.expect("Failed to get response.").bytes),
-                Some(url.as_str()),
-            )
-            .expect("Failed to parse feed.");
-            *sync_lock.lock().unwrap() = false;
-            *title.lock().unwrap() = feed
-                .title
-                .map(|text| text.content)
-                .unwrap_or("No title".to_owned());
-            feed.entries.iter().for_each(|item| {
-                let article_id =
-                    ArticleUuid::new(item.updated, item.published, &entry_uuid, &item.id);
-                let mut article_id_set = article_id_set
-                    .lock()
-                    .expect("Failed to get the lock on article id set.");
-                if !article_id_set.contains(&article_id) {
-                    article_id_set.insert(article_id.clone());
-                    article_map
+            if let ehttp::Result::Ok(response) = result {
+                let feed = feed_rs::parser::parse_with_uri(
+                    std::io::Cursor::new(response.bytes),
+                    Some(url.as_str()),
+                )
+                .expect("Failed to parse feed.");
+                *sync_lock.lock().unwrap() = false;
+                *title.lock().unwrap() = feed
+                    .title
+                    .map(|text| text.content)
+                    .unwrap_or("No title".to_owned());
+                feed.entries.iter().for_each(|item| {
+                    let article_id =
+                        ArticleUuid::new(item.updated, item.published, &entry_uuid, &item.id);
+                    let mut article_id_set = article_id_set
                         .lock()
-                        .expect("Failed to get the lock on article map")
-                        .insert(
-                            article_id,
-                            Arc::new(Mutex::new(
-                                Article::from(item.to_owned()).set_belonging(&entry_uuid),
-                            )),
-                        );
-                }
-            });
+                        .expect("Failed to get the lock on article id set.");
+                    if !article_id_set.contains(&article_id) {
+                        article_id_set.insert(article_id.clone());
+                        article_map
+                            .lock()
+                            .expect("Failed to get the lock on article map")
+                            .insert(
+                                article_id,
+                                Arc::new(Mutex::new(
+                                    Article::from(item.to_owned()).set_belonging(&entry_uuid),
+                                )),
+                            );
+                    }
+                });
+            } else {
+                *sync_lock.lock().unwrap() = false;
+            }
         });
         Ok(true)
     }
