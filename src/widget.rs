@@ -80,8 +80,10 @@ impl<'app> Widget for CollapsingFolder<'app> {
                     self.app.rss_client.delete_folder(self.folder_id).unwrap();
                 }
             });
-            for feed_id in self.app.rss_client.list_entry_by_folder(self.folder_id) {
-                ui.add(FeedMinimal::new(self.app, feed_id));
+            if let Ok(feed_ids) = self.app.rss_client.try_list_entry_by_folder(self.folder_id) {
+                for feed_id in feed_ids {
+                    ui.add(FeedMinimal::new(self.app, feed_id));
+                }
             }
         });
         response.body_response.unwrap_or(response.header_response)
