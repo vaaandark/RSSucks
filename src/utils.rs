@@ -430,6 +430,12 @@ pub mod rss_client_ng {
     }
 
     impl RssClient {
+        pub fn new(feed: feed::Feed) -> Self {
+            RssClient {
+                feed: Rc::new(RefCell::new(feed)),
+            }
+        }
+
         pub fn get(&self) -> Rc<RefCell<feed::Feed>> {
             Rc::clone(&self.feed)
         }

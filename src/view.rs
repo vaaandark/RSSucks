@@ -7,6 +7,8 @@ use uuid::Uuid;
 use crate::utils::rss_client_ng::ArticleId;
 use crate::widgets::article;
 use crate::{
+    feed::Feed,
+    opml::Opml,
     utils::rss_client_ng::{EntryId, FolderId, RssClient},
     widget::{self, CollapsingFolder},
     RSSucks,
@@ -296,7 +298,7 @@ impl<'app> LeftSidePanel<'app> {
 
 impl<'app> LeftSidePanel<'app> {
     pub fn show(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::left("left_panel").show(ctx, |ui| {
+        egui::SidePanel::left("left_panel").show(ctx, move |ui| {
             egui::widgets::global_dark_light_mode_buttons(ui);
             ui.heading("Rust SuckS");
             ui.label("用 Rust 写的 RSS 阅读器");
@@ -305,6 +307,22 @@ impl<'app> LeftSidePanel<'app> {
             ui.separator();
 
             ui.label("订阅列表");
+
+            let app = self.app as *const RSSucks as *mut RSSucks;
+            if ui.button("导入配置").clicked() {
+                async_std::task::block_on(async move {
+                    if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
+                        let data = file.read().await;
+                        if let Ok(opml) = Opml::try_from_str(&String::from_utf8_lossy(&data)) {
+                            if let Ok(feed) = Feed::try_from(opml) {
+                                unsafe {
+                                    (*app).import_feed(feed);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
 
             ui.separator();
 
