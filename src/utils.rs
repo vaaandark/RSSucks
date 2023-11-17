@@ -522,14 +522,14 @@ pub mod rss_client_ng {
                 .collect()
         }
 
-        pub fn list_entry_by_folder(&self, folder_id: FolderId) -> Vec<EntryId> {
-            self.feed
+        pub fn try_list_entry_by_folder(&self, folder_id: FolderId) -> Result<Vec<EntryId>> {
+            Ok(self
+                .feed
                 .borrow()
-                .try_get_entry_ids_by_folder_id(&folder_id.0)
-                .unwrap()
+                .try_get_entry_ids_by_folder_id(&folder_id.0)?
                 .into_iter()
                 .map(EntryId::from)
-                .collect()
+                .collect())
         }
 
         pub fn get_article_by_id(&self, article_id: &ArticleId) -> Option<Article> {
@@ -541,7 +541,7 @@ pub mod rss_client_ng {
         }
 
         pub fn try_start_sync_folder(&self, id: FolderId) -> Result<()> {
-            for feed_id in self.list_entry_by_folder(id) {
+            for feed_id in self.try_list_entry_by_folder(id)? {
                 self.try_start_sync_entry(feed_id)?;
             }
 
