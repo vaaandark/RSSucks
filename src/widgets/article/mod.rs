@@ -165,6 +165,10 @@ impl<'a> Builder<'a> {
                                 }
                                 text.to_string()
                             };
+                            // handle any text in unsupported tags or not in any scope of tags as paragraph
+                            if element.typ == ElementType::Others {
+                                element.typ = ElementType::Paragraph;
+                            }
                             fulltext += &text;
                             element.text = Some(stylize_text(&element, text));
                             elements.push(element);
