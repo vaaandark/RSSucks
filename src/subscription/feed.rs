@@ -4,7 +4,7 @@ use super::opml;
 use anyhow::{anyhow, Context, Error, Ok, Result};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::{cell::RefCell, rc::Rc};
@@ -29,7 +29,7 @@ impl From<Uuid> for EntryUuid {
 }
 
 /// Universally Unique Identifier for [`Folder`].
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct FolderUuid(Uuid);
 
 impl Deref for FolderUuid {
@@ -171,7 +171,7 @@ pub struct Folder {
     /// The title of the feed.
     title: String,
     /// The IDs of entries which belong to this folder.
-    entries: HashSet<EntryUuid>,
+    entries: BTreeSet<EntryUuid>,
     /// UUID of this feed folder.
     uuid: FolderUuid,
 }
@@ -182,7 +182,7 @@ impl Folder {
     pub fn new(name: impl ToString) -> Self {
         Folder {
             title: name.to_string(),
-            entries: HashSet::new(),
+            entries: BTreeSet::new(),
             uuid: Uuid::new_v4().into(),
         }
     }
@@ -212,8 +212,8 @@ impl TryFrom<opml::Opml> for Feed {
         let version = value.version;
         let head = value.head.map(Head::from);
         let mut orphans = HashSet::new();
-        let mut entries_map = HashMap::new();
-        let mut folders_map = HashMap::new();
+        let mut entries_map = BTreeMap::new();
+        let mut folders_map = BTreeMap::new();
         for outline in value.body.outlines {
             match outline {
                 opml::Outline::Entry(e) => {
@@ -225,7 +225,7 @@ impl TryFrom<opml::Opml> for Feed {
                 }
                 opml::Outline::Folder(f) => {
                     let uuid = Uuid::new_v4().into();
-                    let mut entries = HashSet::new();
+                    let mut entries = BTreeSet::new();
                     for e in f.entries {
                         let entry = Entry::try_from(e)
                             .with_context(|| format!("At folder {}", f.text))?
@@ -270,9 +270,9 @@ pub struct Feed {
     /// IDs of orphan feed entries which don't belong to any folders.
     orphans: HashSet<EntryUuid>,
     /// Map for all entries.
-    entries_map: HashMap<EntryUuid, Rc<RefCell<Entry>>>,
+    entries_map: BTreeMap<EntryUuid, Rc<RefCell<Entry>>>,
     /// Map for all folders.
-    folders_map: HashMap<FolderUuid, Rc<RefCell<Folder>>>,
+    folders_map: BTreeMap<FolderUuid, Rc<RefCell<Folder>>>,
     /// Map for all articles.
     articles_map: ArticlesMap,
 }
