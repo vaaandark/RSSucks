@@ -479,13 +479,26 @@ pub mod rss_client_ng {
                 .collect()
         }
 
-        pub fn create_entry(&self, url: url::Url) -> EntryId {
-            let entry = feed::Entry::new(url);
+        pub fn create_entry(&self, url: url::Url, alias: Option<impl ToString>) -> EntryId {
+            let entry = if let Some(alias) = alias {
+                feed::Entry::new_with_alias(alias, url)
+            } else {
+                feed::Entry::new(url)
+            };
             EntryId::from(self.feed.borrow_mut().add_orphan_entry(entry))
         }
 
-        pub fn create_entry_with_folder(&self, url: url::Url, folder_id: FolderId) -> EntryId {
-            let entry = feed::Entry::new(url);
+        pub fn create_entry_with_folder(
+            &self,
+            url: url::Url,
+            folder_id: FolderId,
+            alias: Option<impl ToString>,
+        ) -> EntryId {
+            let entry = if let Some(alias) = alias {
+                feed::Entry::new_with_alias(alias, url)
+            } else {
+                feed::Entry::new(url)
+            };
             EntryId::from(
                 self.feed
                     .borrow_mut()

@@ -88,7 +88,7 @@ impl Entry {
     pub fn new(xml_url: Url) -> Self {
         Entry {
             alias: None,
-            title: Arc::new(Mutex::new("No title".to_owned())),
+            title: Arc::new(Mutex::new("New feed".to_owned())),
             html_url: xml_url.join("/").ok(),
             xml_url,
             articles: Arc::new(Mutex::new(BTreeSet::new())),
