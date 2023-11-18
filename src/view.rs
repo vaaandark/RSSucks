@@ -242,7 +242,8 @@ impl Window for NewFeedWindow {
                     match url::Url::parse(&self.feed_url) {
                         Ok(url) => {
                             if ui.button("✔").on_hover_text("确定").clicked() {
-                                let alias = if self.alias.is_empty() || self.alias == "稍后自动获取" {
+                                let alias = if self.alias.is_empty() || self.alias == "稍后自动获取"
+                                {
                                     None
                                 } else {
                                     Some(&self.alias)

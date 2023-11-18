@@ -39,14 +39,19 @@ impl<'a> Widget for FeedMinimal<'a> {
                     ui.spinner();
                 }
 
-                if ui.button("🔁").on_hover_text("拉取文章").clicked() {
-                    self.app.rss_client.try_start_sync_entry(self.id).unwrap();
-                }
+                if ui
+                    .interact(ui.max_rect(), ui.id(), egui::Sense::hover())
+                    .hovered()
+                {
+                    if ui.button("🔁").on_hover_text("拉取文章").clicked() {
+                        self.app.rss_client.try_start_sync_entry(self.id).unwrap();
+                    }
 
-                if ui.button("🗙").on_hover_text("删除订阅").clicked() {
-                    self.app.rss_client.delete_entry(self.id);
+                    if ui.button("🗙").on_hover_text("删除订阅").clicked() {
+                        self.app.rss_client.delete_entry(self.id);
+                    }
                 }
-            });
+            })
         })
         .response
     }
@@ -74,14 +79,17 @@ impl<'app> Widget for CollapsingFolder<'app> {
                         .try_start_sync_folder(self.folder_id)
                         .unwrap();
                 }
-
                 if ui.button("📋").on_hover_text("新增订阅").clicked() {
                     self.app.add_window(view::NewFeedWindow::new(
                         self.app.rss_client.clone(),
                         Some(self.folder_id),
                     ));
                 }
-                if ui.button("🗙").on_hover_text("删除文件夹").clicked() {
+                if ui
+                    .interact(ui.max_rect(), ui.id(), egui::Sense::hover())
+                    .hovered()
+                    && ui.button("🗙").on_hover_text("删除文件夹").clicked()
+                {
                     self.app.rss_client.delete_folder(self.folder_id).unwrap();
                 }
             });
