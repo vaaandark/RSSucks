@@ -202,7 +202,11 @@ impl From<super::feed::Feed> for Opml {
             };
             outlines.push(Outline::Folder(folder));
         }
-        Opml { version, head, body: Body { outlines } }
+        Opml {
+            version,
+            head,
+            body: Body { outlines },
+        }
     }
 }
 

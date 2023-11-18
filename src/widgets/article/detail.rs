@@ -4,7 +4,7 @@ use egui::{Image, Margin, RichText, Rounding, Widget};
 
 use crate::{utils::rss_client_ng::ArticleId, view::View, RSSucks};
 
-use super::{Builder, Element, ElementType};
+use super::{absolute_url, Builder, Element, ElementType};
 
 pub struct Detail {
     entry_title: Option<String>,
@@ -220,8 +220,13 @@ impl Widget for &Detail {
                                                     }
                                                     if let Some(src) = &element.image_tuple.0 {
                                                         ui.add_space(4.0);
+                                                        let url = self
+                                                            .link
+                                                            .as_ref()
+                                                            .map(|link| absolute_url(src, link))
+                                                            .unwrap_or(src.to_owned());
                                                         ui.add(
-                                                            Image::from(src)
+                                                            Image::from(url)
                                                                 .fit_to_original_size(1.0)
                                                                 .max_width(
                                                                     match element.image_tuple.1 {

@@ -94,6 +94,16 @@ fn stylize_text(element: &Element, text: String) -> RichText {
     richtext
 }
 
+fn absolute_url(url: &str, link: &str) -> String {
+    if url::Url::parse(url).is_err() {
+        if let Ok(mut link) = url::Url::parse(link) {
+            link.set_path(url);
+            return link.as_str().to_owned();
+        }
+    }
+    url.to_owned()
+}
+
 // A builder helps you to get article details and previews.
 pub struct Builder<'a> {
     entry_title: Option<String>,

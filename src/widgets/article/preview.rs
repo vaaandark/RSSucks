@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{utils::rss_client_ng::ArticleId, RSSucks};
 
-use super::{Builder, Element, ElementType};
+use super::{absolute_url, Builder, Element, ElementType};
 
 pub struct Preview {
     // rendering previews needs ownership
@@ -17,6 +17,7 @@ pub struct Preview {
     fulltext: Option<String>,
     max_images_num: usize,
     title: String,
+    link: Option<String>,
     pub article_id: ArticleId,
     app: Rc<RSSucks>,
 }
@@ -32,6 +33,7 @@ impl<'a> From<Builder<'a>> for Preview {
             fulltext: value.fulltext.clone(),
             max_images_num: 3,
             title: value.title.to_owned(),
+            link: value.link.map(|l| l.to_owned()),
             article_id: value.article_id,
             app: value.app,
         }
@@ -114,8 +116,13 @@ impl Widget for &Preview {
                                 .show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         images_iter.for_each(|src| {
+                                            let url = self
+                                                .link
+                                                .as_ref()
+                                                .map(|link| absolute_url(src, link))
+                                                .unwrap_or(src.to_owned());
                                             ui.add(
-                                                Image::from(src)
+                                                Image::new(url)
                                                     .fit_to_exact_size(egui::Vec2::new(
                                                         f32::INFINITY,
                                                         128.0,
