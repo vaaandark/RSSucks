@@ -155,6 +155,57 @@ impl From<&opml::Outline> for Outline {
     }
 }
 
+impl From<super::feed::Entry> for Entry {
+    fn from(value: super::feed::Entry) -> Self {
+        Entry {
+            text: value.title(),
+            title: Some(value.title()),
+            xml_url: Some(value.xml_url),
+            html_url: value.html_url,
+        }
+    }
+}
+
+impl From<super::feed::Head> for Head {
+    fn from(value: super::feed::Head) -> Self {
+        Head { title: value.title }
+    }
+}
+
+impl From<super::feed::Feed> for Opml {
+    fn from(value: super::feed::Feed) -> Self {
+        let version = value.version.to_owned();
+        let head = value.head.to_owned().map(Head::from);
+        let mut outlines = vec![];
+        for orphan_id in value.get_all_orphan_entry_ids() {
+            let orphan = value.try_get_entry_by_id(&orphan_id).unwrap();
+            let orphan_entry = Entry::from(orphan.borrow().to_owned());
+            outlines.push(Outline::Entry(orphan_entry));
+        }
+        for folder_id in value.get_all_folder_ids() {
+            let folder = value.try_get_folder_by_id(&folder_id).unwrap();
+            let mut folder_outlines = vec![];
+            for entry_id in value.try_get_entry_ids_by_folder_id(&folder_id).unwrap() {
+                let entry = Entry::from(
+                    value
+                        .try_get_entry_by_id(&entry_id)
+                        .unwrap()
+                        .borrow()
+                        .to_owned(),
+                );
+                folder_outlines.push(entry);
+            }
+            let folder = Folder {
+                text: folder.borrow().title().to_owned(),
+                title: Some(folder.borrow().title().to_owned()),
+                entries: folder_outlines,
+            };
+            outlines.push(Outline::Folder(folder));
+        }
+        Opml { version, head, body: Body { outlines } }
+    }
+}
+
 impl From<&opml::Head> for Head {
     fn from(value: &opml::Head) -> Self {
         Head {

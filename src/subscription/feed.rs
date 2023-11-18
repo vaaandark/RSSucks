@@ -47,7 +47,7 @@ impl From<Uuid> for FolderUuid {
 
 /// OPML head information,
 /// which can be converted from [`opml::Head`].
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Head {
     pub title: Option<String>,
 }
@@ -61,7 +61,7 @@ impl From<opml::Head> for Head {
 /// Feed entry, the basic unit for getting subsciptions from feed,
 /// which can be converted from [`opml::Entry`] (see [`Entry::try_from`]).
 #[allow(unused)]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Entry {
     /// Alias for subscription, takes precedence over `title`
     alias: Option<String>,
@@ -261,7 +261,7 @@ type ArticlesMap = Arc<Mutex<BTreeMap<ArticleUuid, Arc<Mutex<Article>>>>>;
 /// which contains orphan entries directly and folders with entries inside.
 /// Feed can be converted from [`opml::Opml`].
 #[allow(unused)]
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct Feed {
     /// OPML version.
     pub version: String,

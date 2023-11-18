@@ -323,6 +323,17 @@ impl<'app> LeftSidePanel<'app> {
                         }
                     });
                 }
+                if ui.button("📤").on_hover_text("导出配置").clicked() {
+                    async_std::task::block_on(async move {
+                        if let Some(file) = rfd::AsyncFileDialog::new().save_file().await {
+                            let opml =
+                                Opml::from(unsafe { (*app).rss_client.get().borrow().to_owned() });
+                            if let Ok(data) = opml.try_dump() {
+                                let _ = file.write(data.as_bytes()).await;
+                            }
+                        }
+                    });
+                }
                 if ui.button("🔁").on_hover_text("拉取全部").clicked() {
                     let _ = self.app.rss_client.try_start_sync_all();
                 }
