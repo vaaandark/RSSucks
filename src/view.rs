@@ -179,6 +179,7 @@ pub struct NewFeedWindow {
     client: RssClient,
     id: egui::Id,
     is_open: bool,
+    alias: String,
     folder_id: Option<FolderId>,
     feed_url: String,
 }
@@ -189,6 +190,7 @@ impl NewFeedWindow {
             client,
             id: egui::Id::new(Uuid::new_v4()),
             is_open: true,
+            alias: "稍后自动获取".to_owned(),
             folder_id,
             feed_url: String::new(),
         }
@@ -203,6 +205,34 @@ impl Window for NewFeedWindow {
             .collapsible(true)
             .title_bar(true)
             .show(ctx, |ui| {
+                let selected = if let Some(select_folder_id) = self.folder_id {
+                    self.client.get_folder(&select_folder_id).unwrap().name()
+                } else {
+                    "None".to_owned()
+                };
+                ui.horizontal(|ui| {
+                    ui.label("目标文件夹");
+                    egui::ComboBox::from_label("请选择")
+                        .selected_text(selected)
+                        .show_ui(ui, |ui| {
+                            self.client.list_folder().iter().for_each(|folder_id| {
+                                if let Some(folder) = self.client.get_folder(folder_id) {
+                                    ui.selectable_value(
+                                        &mut self.folder_id,
+                                        Some(*folder_id),
+                                        folder.name(),
+                                    );
+                                }
+                            });
+                            ui.selectable_value(&mut self.folder_id, None, "不选择");
+                        });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("订阅标题：");
+                    ui.text_edit_singleline(&mut self.alias);
+                });
+
                 ui.horizontal(|ui| {
                     ui.label("订阅链接：");
                     ui.text_edit_singleline(&mut self.feed_url);
@@ -212,12 +242,17 @@ impl Window for NewFeedWindow {
                     match url::Url::parse(&self.feed_url) {
                         Ok(url) => {
                             if ui.button("✔").on_hover_text("确定").clicked() {
+                                let alias = if self.alias.is_empty() || self.alias == "稍后自动获取" {
+                                    None
+                                } else {
+                                    Some(&self.alias)
+                                };
                                 match self.folder_id {
                                     Some(folder_id) => {
-                                        self.client.create_entry_with_folder(url, folder_id);
+                                        self.client.create_entry_with_folder(url, folder_id, alias);
                                     }
                                     None => {
-                                        self.client.create_entry(url);
+                                        self.client.create_entry(url, alias);
                                     }
                                 }
                                 self.is_open = false;
@@ -337,16 +372,19 @@ impl<'app> LeftSidePanel<'app> {
                 if ui.button("🔁").on_hover_text("拉取全部").clicked() {
                     let _ = self.app.rss_client.try_start_sync_all();
                 }
+                if ui.button("新建文件夹").clicked() {
+                    self.app
+                        .add_window(NewFolderWindow::new(self.app.rss_client.clone()));
+                }
+                if ui.button("新建订阅").clicked() {
+                    self.app
+                        .add_window(NewFeedWindow::new(self.app.rss_client.clone(), None));
+                }
             });
 
             ui.separator();
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                if ui.button("新建文件夹").clicked() {
-                    self.app
-                        .add_window(NewFolderWindow::new(self.app.rss_client.clone()));
-                }
-
                 ui.separator();
 
                 for folder_id in self.app.rss_client.list_folder() {
