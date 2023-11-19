@@ -335,7 +335,14 @@ impl<'app> LeftSidePanel<'app> {
 impl<'app> LeftSidePanel<'app> {
     pub fn show(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left_panel").show(ctx, move |ui| {
-            egui::widgets::global_dark_light_mode_buttons(ui);
+            let former_visuals = self.app.visuals.borrow().clone();
+            ui.ctx().set_visuals(former_visuals.clone());
+            if let Some(visuals) = former_visuals.light_dark_small_toggle_button(ui) {
+                ui.ctx().set_visuals(visuals.clone());
+                if visuals != former_visuals {
+                    self.app.visuals.replace(visuals);
+                }
+            }
             ui.heading("Rust SuckS");
             ui.label("用 Rust 写的 RSS 阅读器");
             ui.hyperlink_to("RSSucks on Github", "https://github.com/jyi2ya/RSSucks");

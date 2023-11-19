@@ -14,6 +14,7 @@ use crate::{
 #[serde(default)]
 pub struct RSSucks {
     pub rss_client: RssClient,
+    pub visuals: Rc<RefCell<egui::Visuals>>,
 
     #[serde(skip)]
     pub view: RefCell<Option<Rc<Box<dyn View>>>>,
