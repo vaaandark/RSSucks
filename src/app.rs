@@ -61,7 +61,10 @@ impl App {
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            let res: App = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            // Sync all feed
+            let _ = res.app.rss_client.try_start_sync_all();
+            return res;
         }
 
         Default::default()
