@@ -4,12 +4,11 @@ use std::rc::Rc;
 use egui::Widget;
 use uuid::Uuid;
 
-use crate::utils::rss_client_ng::ArticleId;
-use crate::widgets::article;
+use crate::render::article;
 use crate::{
     subscription::feed::Feed,
     subscription::opml::Opml,
-    utils::rss_client_ng::{EntryId, FolderId, RssClient},
+    utils::rss_client_ng::{ArticleId, EntryId, FolderId, RssClient},
     widget::{self, CollapsingFolder},
     RSSucks,
 };
