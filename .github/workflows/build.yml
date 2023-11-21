@@ -1,8 +1,6 @@
-name: CI build
+on: [push]
 
-on:
-  push:
-    branches: master
+name: CI build
 
 jobs:
   build:
@@ -39,4 +37,3 @@ jobs:
           file: target/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
-
