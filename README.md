@@ -36,7 +36,7 @@ RustSuckS 是一个高性能、轻量级而且跨平台的 RSS 阅读器。
 
 推荐从右侧的 [Github Release](https://github.com/vaaandark/RSSucks/releases) 下载对应平台的二进制文件。
 
-也可以到 [GitHub Actions](https://github.com/vaaandark/RSSucks/actions?query=branch%3Amaster+is%3Asuccess+event%3Apush+name%3Abuild+actor%3Avaaandark) 下载最新构建的二进制，包含 Linux 和 Windows 版本。
+也可以到 [GitHub Actions](https://github.com/vaaandark/RSSucks/actions?query=workflow%3A%22CI+build%22+actor%3Avaaandark+branch%3Amaster+event%3Apush+is%3Asuccess) 下载最新构建的二进制，包含 Linux 和 Windows 版本。
 
 ### 从源码编译
 
